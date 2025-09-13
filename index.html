@@ -695,43 +695,11 @@
             // Afficher les vols avec boutons de réservation
             if (result.bestFlights && result.bestFlights.length > 0) {
                 flightResultsHtml = `
-                    <div style="margin-top: 15px;">
-                        <strong>🏆 Vols disponibles à la réservation:</strong>
-                        <div style="margin-top: 10px;">
-                            ${result.bestFlights.slice(0, 3).map((flight, index) => `
-                                <div class="flight-booking-card">
-                                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
-                                        <div style="flex: 1;">
-                                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                                                <strong>${index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'} ${flight.airline?.name || 'Vol'}</strong>
-                                                <span class="confidence-badge" style="background: ${confidenceColor}; padding: 2px 8px; border-radius: 12px; color: white; font-size: 11px;">
-                                                    ⭐ Top ${index + 1}
-                                                </span>
-                                            </div>
-                                            <div style="font-size: 13px; color: #64748b; margin-bottom: 8px;">
-                                              🕐 ALLER: ${flight.schedule?.departure || 'N/A'} → ${flight.schedule?.arrival || 'N/A'} 
-                                              | ⏱️ ${flight.schedule?.duration || 'N/A'}
-                                              | ${flight.route?.stopsText || 'N/A'}
-                                              ${flight.schedule?.return ? `<br>🔄 RETOUR: ${flight.schedule.return.departure} → ${flight.schedule.return.arrival} | ⏱️ ${flight.schedule.return.duration} | ${flight.schedule.return.stops === 0 ? 'Direct' : flight.schedule.return.stops + ' escale(s)'}` : ''}
-                                           </div>
-                                            <div style="font-size: 12px; color: #22c55e;">
-                                                ${flight.score?.recommendation || 'Vol recommandé'}
-                                            </div>
-                                        </div>
-                                        <div style="text-align: right;">
-                                            <div style="font-size: 18px; font-weight: bold; color: #0369a1; margin-bottom: 8px;">
-                                                ${flight.price?.formatted || 'Prix N/A'}
-                                            </div>
-                                            <button onclick="selectFlight(${index}, ${JSON.stringify(flight).replace(/"/g, '&quot;').replace(/'/g, '&#39;')})"
-                                                     style="background: linear-gradient(135deg, #22c55e, #16a34a); color: white; border: none; padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.3s ease;">
-                                                🎫 Réserver
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
+                    // Dans l'interface web, section d'affichage des vols, remplacez temporairement par :
+                   <div style="font-size: 13px; color: #64748b; margin-bottom: 8px;">
+                       🕐 TEST: ${JSON.stringify(flight.schedule).substring(0, 100)}... 
+              | Prix: ${JSON.stringify(flight.price).substring(0, 50)}...
+                </div>
                 `;
             }
 
