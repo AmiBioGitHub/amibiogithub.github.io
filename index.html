@@ -999,9 +999,29 @@
         }
 
         // Afficher la confirmation de prix et formulaire passagers
+        // Afficher la confirmation de prix et formulaire passagers
         function displayPriceConfirmation(priceResult) {
+            console.log('🔍 Debug prix reçu:', priceResult);
+            
             const pricing = priceResult.pricing || {};
             const warnings = priceResult.warnings || [];
+            
+            // Extraire le prix correctement selon la structure reçue
+            let finalPrice = 'N/A';
+            let currency = 'EUR';
+            
+            if (pricing.total) {
+                finalPrice = parseFloat(pricing.total).toFixed(2);
+                currency = pricing.currency || 'EUR';
+            } else if (pricing.totalPrice) {
+                finalPrice = parseFloat(pricing.totalPrice).toFixed(2);
+                currency = pricing.currency || 'EUR';
+            } else if (pricing.basePrice) {
+                finalPrice = parseFloat(pricing.basePrice).toFixed(2);
+                currency = pricing.currency || 'EUR';
+            }
+            
+            console.log('💰 Prix final calculé:', finalPrice, currency);
             
             let warningsHtml = '';
             if (warnings.length > 0) {
@@ -1013,11 +1033,15 @@
                 `;
             }
             
+            // Afficher statut de confirmation
+            const isRealTimeConfirmed = priceResult.pricingConfirmed === true;
+            const confirmationText = isRealTimeConfirmed ? 'Prix confirmé en temps réel' : 'Prix basé sur la recherche';
+            
             const confirmationHtml = `
                 <div style="background: linear-gradient(135deg, #f0fdf4, #dcfce7); border: 2px solid #22c55e; border-radius: 16px; padding: 20px; margin-top: 15px;">
                     <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
-                        <span style="font-size: 24px;">✅</span>
-                        <strong style="color: #15803d; font-size: 16px;">Prix confirmé en temps réel</strong>
+                        <span style="font-size: 24px;">${isRealTimeConfirmed ? '✅' : '💰'}</span>
+                        <strong style="color: #15803d; font-size: 16px;">${confirmationText}</strong>
                     </div>
                     
                     ${warningsHtml}
@@ -1025,11 +1049,12 @@
                     <div style="background: white; padding: 15px; border-radius: 12px; margin: 15px 0;">
                         <div style="text-align: center;">
                             <div style="font-size: 24px; font-weight: bold; color: #15803d; margin-bottom: 8px;">
-                                ${pricing.totalPrice?.toFixed(2) || pricing.basePrice?.toFixed(2) || 'N/A'} ${pricing.currency || 'EUR'}
+                                ${finalPrice} ${currency}
                             </div>
                             <div style="font-size: 14px; color: #64748b;">
                                 Prix confirmé pour ${pricing.breakdown?.adults || 1} passager(s)
                             </div>
+                            ${isRealTimeConfirmed ? '' : '<div style="font-size: 12px; color: #f59e0b; margin-top: 4px;">Prix de la recherche initiale</div>'}
                         </div>
                     </div>
                     
