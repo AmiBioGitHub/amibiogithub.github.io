@@ -709,10 +709,11 @@
                                                 </span>
                                             </div>
                                             <div style="font-size: 13px; color: #64748b; margin-bottom: 8px;">
-                                                🕐 ${flight.schedule?.departure || 'N/A'} → ${flight.schedule?.arrival || 'N/A'} 
-                                                | ⏱️ ${flight.schedule?.duration || 'N/A'}
-                                                | ${flight.route?.stopsText || 'N/A'}
-                                            </div>
+                                              🕐 ALLER: ${flight.schedule?.departure || 'N/A'} → ${flight.schedule?.arrival || 'N/A'} 
+                                              | ⏱️ ${flight.schedule?.duration || 'N/A'}
+                                              | ${flight.route?.stopsText || 'N/A'}
+                                              ${flight.schedule?.return ? `<br>🔄 RETOUR: ${flight.schedule.return.departure} → ${flight.schedule.return.arrival} | ⏱️ ${flight.schedule.return.duration} | ${flight.schedule.return.stops === 0 ? 'Direct' : flight.schedule.return.stops + ' escale(s)'}` : ''}
+                                           </div>
                                             <div style="font-size: 12px; color: #22c55e;">
                                                 ${flight.score?.recommendation || 'Vol recommandé'}
                                             </div>
