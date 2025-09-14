@@ -1,10 +1,10 @@
 // Configuration Webhooks - URLs DE PRODUCTION n8n
-const N8N_WEBHOOK_URL = 'https://1a8b7c488aa126c181004b8df481658d.serveo.net/webhook/flight-search';
+const N8N_WEBHOOK_URL = 'https://e9863db6588d55725ab169d4bdb74cb9.serveo.net/webhook/flight-search';
 
 const BOOKING_WEBHOOKS = {
-    flightSelect: 'https://1a8b7c488aa126c181004b8df481658d.serveo.net/webhook/flight-select',
-    passengerData: 'https://1a8b7c488aa126c181004b8df481658d.serveo.net/webhook/passenger-data', 
-    bookingConfirm: 'https://1a8b7c488aa126c181004b8df481658d.serveo.net/webhook/booking-confirm'
+    flightSelect: 'https://e9863db6588d55725ab169d4bdb74cb9.serveo.net/webhook/flight-select',
+    passengerData: 'https://e9863db6588d55725ab169d4bdb74cb9.serveo.net/webhook/passenger-data', 
+    bookingConfirm: 'https://e9863db6588d55725ab169d4bdb74cb9.serveo.net/webhook/booking-confirm'
 };
 
 // État de l'application
