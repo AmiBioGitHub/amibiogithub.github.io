@@ -3,13 +3,9 @@ const N8N_WEBHOOK_URL = 'https://e9863db6588d55725ab169d4bdb74cb9.serveo.net/web
 
 const BOOKING_WEBHOOKS = {
     flightSelect: 'https://e9863db6588d55725ab169d4bdb74cb9.serveo.net/webhook/flight-select',
-    passengerData: 'https://e9863db6588d55725ab169d4bdb74cb9.serveo.net/webhook/passenger-data', 
+    passengerData: 'https://e9863db6588d55725ab169d4bdb74cb9.serveo.net/webhook/passenger-data',
     bookingConfirm: 'https://e9863db6588d55725ab169d4bdb74cb9.serveo.net/webhook/booking-confirm'
 };
-
-// État de l'application
-let isProcessing = false;
-let sessionId = 'web-' + Date.now();
 
 // État global de la réservation
 let bookingState = {
@@ -17,7 +13,7 @@ let bookingState = {
     passengers: [],
     contact: {},
     currentStep: 'search',
-    sessionId: sessionId
+    sessionId: 'web-' + Date.now()
 };
 
 // Éléments DOM
@@ -40,16 +36,7 @@ messageInput.addEventListener('keydown', function(e) {
     }
 });
 
-// Focus automatique
 messageInput.focus();
-
-// Fonction pour remplir un exemple
-function fillExample(text) {
-    messageInput.value = text;
-    messageInput.focus();
-    messageInput.style.height = 'auto';
-    messageInput.style.height = messageInput.scrollHeight + 'px';
-}
 
 // Ajouter un message au chat
 function addMessage(content, isUser = false, isFlightResult = false) {
@@ -80,59 +67,10 @@ function addMessage(content, isUser = false, isFlightResult = false) {
 // Afficher/masquer l'indicateur de frappe
 function showTyping(show = true) {
     typingIndicator.style.display = show ? 'flex' : 'none';
-    if (show) {
-        chatContainer.scrollTop = chatContainer.scrollHeight;
-    }
+    if (show) chatContainer.scrollTop = chatContainer.scrollHeight;
 }
 
-// Afficher notification
-function showNotification(message, type = 'info') {
-    const notification = document.createElement('div');
-    notification.className = `notification notification-${type}`;
-    notification.textContent = message;
-    
-    document.body.appendChild(notification);
-    
-    setTimeout(() => notification.classList.add('show'), 100);
-    
-    setTimeout(() => {
-        notification.classList.remove('show');
-        setTimeout(() => notification.remove(), 300);
-    }, 3000);
-}
-
-// Dictionnaire des compagnies aériennes
-const airlineNames = {
-    'AF': 'Air France', 'LH': 'Lufthansa', 'BA': 'British Airways', 'IB': 'Iberia',
-    'KL': 'KLM', 'AZ': 'ITA Airways', 'SN': 'Brussels Airlines', 'LX': 'Swiss',
-    'OS': 'Austrian Airlines', 'SK': 'SAS', 'AY': 'Finnair', 'TP': 'TAP Portugal',
-    'EI': 'Aer Lingus', 'FR': 'Ryanair', 'U2': 'easyJet', 'VY': 'Vueling',
-    'W6': 'Wizz Air', 'EW': 'Eurowings', 'HV': 'Transavia', 'QR': 'Qatar Airways'
-};
-
-function getAirlineName(code) {
-    return airlineNames[code] || `${code} Airlines`;
-}
-
-function getClassEmoji(travelClass) {
-    switch(travelClass) {
-        case 'FIRST': return '👑';
-        case 'BUSINESS': return '💼';
-        case 'PREMIUM_ECONOMY': return '⭐';
-        default: return '🎫';
-    }
-}
-
-function formatTravelClass(travelClass) {
-    switch(travelClass) {
-        case 'FIRST': return 'Première';
-        case 'BUSINESS': return 'Affaires';
-        case 'PREMIUM_ECONOMY': return 'Premium Eco';
-        default: return 'Économique';
-    }
-}
-
-// Fonction d’envoi message
+// === Recherche de vol ===
 async function sendMessage() {
     const message = messageInput.value.trim();
     if (!message) return;
@@ -156,7 +94,7 @@ async function sendMessage() {
     }
 }
 
-// Afficher les résultats de recherche
+// === Affichage des résultats ===
 function displayFlightResults(response) {
     if (!response.success || !response.bestFlights || response.bestFlights.length === 0) {
         addMessage("❌ Aucun vol trouvé ou erreur de recherche.", false);
@@ -180,7 +118,7 @@ function displayFlightResults(response) {
         }
 
         flightsHtml += `
-            <div style="background: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin-bottom: 12px; cursor: pointer; transition: all 0.2s;" 
+            <div style="background: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin-bottom: 12px; cursor: pointer;" 
                  onclick="selectFlight(${index}, ${JSON.stringify(flight.originalAmadeusData || flight).replace(/"/g, '&quot;')})">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                     <div style="flex: 1;">
@@ -206,141 +144,53 @@ function displayFlightResults(response) {
     addMessage(flightsHtml, false, true);
 }
 
-// Formater résultats
+// === Formatage des résultats pour affichage initial ===
 function formatFlightResult(result) {
     if (!result.success) {
-        const suggestions = result.suggestions ? result.suggestions.map(s => `• ${s}`).join('<br>') : '';
-        return `
-            <div class="error-message">
-                <strong>❌ ${result.message || 'Erreur lors de l\'analyse'}</strong>
-                ${suggestions ? '<br><br><strong>Suggestions:</strong><br>' + suggestions : ''}
-            </div>
-        `;
+        return `<div class="error-message"><strong>❌ ${result.message || 'Erreur lors de l\'analyse'}</strong></div>`;
     }
 
-    const confidence = result.searchParams?.aiConfidence || result.confidence || 0;
-    const confidenceColor = confidence >= 80 ? '#22c55e' : confidence >= 60 ? '#f59e0b' : '#ef4444';
-    const params = result.searchParams || result;
-
-    let flightResultsHtml = '';
-    
     if (result.bestFlights && result.bestFlights.length > 0) {
         setTimeout(() => displayFlightResults(result), 100);
-        flightResultsHtml = '';
     }
 
     return `
         <div class="flight-result">
             <div class="flight-header">
                 ✈️ Recherche de vol analysée par l'IA
-                <div class="confidence-badge" style="background: ${confidenceColor}">
-                    🎯 ${confidence}% confiance
-                </div>
             </div>
-            
             <div class="flight-route">
-                ${params.originCity || params.originLocationCode} → ${params.destinationCity || params.destinationLocationCode}
+                ${result.searchParams?.originCity} → ${result.searchParams?.destinationCity}
             </div>
-            
-            <div class="flight-details">
-                <div class="detail-item">
-                    <div class="detail-label">Départ</div>
-                    <div class="detail-value">${params.departureDate || 'À définir'}</div>
-                </div>
-                ${params.returnDate ? `
-                    <div class="detail-item">
-                        <div class="detail-label">Retour</div>
-                        <div class="detail-value">${params.returnDate}</div>
-                    </div>
-                ` : ''}
-                <div class="detail-item">
-                    <div class="detail-label">Classe</div>
-                    <div class="detail-value">${getClassEmoji(params.travelClass)} ${formatTravelClass(params.travelClass)}</div>
-                </div>
-                <div class="detail-item">
-                    <div class="detail-label">Passagers</div>
-                    <div class="detail-value">👥 ${params.adults || 1}</div>
-                </div>
-                <div class="detail-item">
-                    <div class="detail-label">Type</div>
-                    <div class="detail-value">${params.tripType === 'round-trip' ? '🔄 Aller-retour' : '➡️ Aller simple'}</div>
-                </div>
-            </div>
-            
-            <div style="margin-top: 15px; padding: 12px; background: rgba(34, 197, 94, 0.1); border-radius: 8px; border-left: 4px solid #22c55e;">
-                <strong>🤖 Analyse IA:</strong> ${params.naturalRequest || 'Recherche analysée avec succès'}
-                ${params.aiModel ? `<br><small>Modèle: ${params.aiModel}</small>` : ''}
-            </div>
-            
-            ${flightResultsHtml}
         </div>
     `;
 }
 
-// Appel API vers n8n
+// === API call vers n8n ===
 async function callFlightAPI(message) {
     try {
         const response = await fetch(N8N_WEBHOOK_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                message: message,
-                sessionId: sessionId,
+                message,
+                sessionId: bookingState.sessionId,
                 timestamp: new Date().toISOString(),
                 source: 'web'
             })
         });
 
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
+        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         return await response.json();
+
     } catch (error) {
         console.error('❌ Erreur API n8n:', error);
-        return simulateFlightSearch(message);
+        return { success: false, message: "Erreur API" };
     }
 }
 
-// Simulation démo
-function simulateFlightSearch(message) {
-    return {
-        success: true,
-        searchParams: {
-            originCity: 'Brussels',
-            destinationCity: 'Bangkok',
-            originLocationCode: 'BRU',
-            destinationLocationCode: 'BKK',
-            departureDate: '2025-03-15',
-            returnDate: '2025-03-25',
-            travelClass: 'ECONOMY',
-            nonStop: true,
-            adults: 1,
-            tripType: 'round-trip',
-            naturalRequest: 'Vol Brussels vers Bangkok',
-            aiConfidence: 85,
-            aiModel: 'demo-mode'
-        },
-        bestFlights: [
-            { 
-                outbound: { departure: '08:30', arrival: '01:15+1', duration: '15h45m' }, 
-                inbound: { departure: '10:00', arrival: '18:30', duration: '10h30m' },
-                price: { amount: 750, currency: 'EUR' } 
-            },
-            { 
-                outbound: { departure: '14:20', arrival: '09:45+1', duration: '17h25m' }, 
-                inbound: { departure: '22:00', arrival: '06:30+1', duration: '8h30m' },
-                price: { amount: 680, currency: 'EUR' } 
-            }
-        ]
-    };
-}
-
-// Fonction de sélection de vol
+// === Sélection d'un vol ===
 async function selectFlight(flightIndex, flightData) {
-    console.log('🎫 Sélection du vol:', flightIndex, flightData);
-    bookingState.selectedFlight = { index: flightIndex, data: flightData, timestamp: new Date().toISOString() };
-
     addMessage('🎫 Vol sélectionné ! Vérification du prix en temps réel...', false);
     showTyping(true);
 
@@ -349,7 +199,7 @@ async function selectFlight(flightIndex, flightData) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                flightIndex: flightIndex,
+                flightIndex,
                 selectedFlight: flightData,
                 passengers: 1,
                 sessionId: bookingState.sessionId,
@@ -367,12 +217,10 @@ async function selectFlight(flightIndex, flightData) {
             bookingState.currentStep = 'passengers';
         } else {
             addMessage(`❌ ${result?.error || 'Erreur lors de la sélection du vol'}`, false);
-            showNotification('❌ Erreur de sélection', 'error');
         }
     } catch (error) {
         showTyping(false);
         console.error('❌ Erreur sélection vol:', error);
         addMessage(`❌ Erreur de connexion: ${error.message}`, false);
-        showNotification('❌ Erreur de sélection', 'error');
     }
 }
