@@ -1,13 +1,21 @@
-// Configuration Webhooks - URLs DE PRODUCTION n8n
-const N8N_WEBHOOK_URL = 'https://e9863db6588d55725ab169d4bdb74cb9.serveo.net/webhook/flight-search';
+// === Configuration Webhooks - URLs DE PRODUCTION n8n ===
+
+// Sous-domaine configurable (changer ici seulement 👇)
+const N8N_SUBDOMAIN = "1035635e0a05e507ba49faa8b5cb40ae.serveo.net";
+
+// Générateur d'URL webhook
+const WEBHOOK = (path) => `https://${N8N_SUBDOMAIN}/webhook/${path}`;
+
+// Endpoints
+const N8N_WEBHOOK_URL = WEBHOOK("flight-search");
 
 const BOOKING_WEBHOOKS = {
-    flightSelect: 'https://e9863db6588d55725ab169d4bdb74cb9.serveo.net/webhook/flight-select',
-    passengerData: 'https://e9863db6588d55725ab169d4bdb74cb9.serveo.net/webhook/passenger-data',
-    bookingConfirm: 'https://e9863db6588d55725ab169d4bdb74cb9.serveo.net/webhook/booking-confirm'
+    flightSelect: WEBHOOK("flight-select"),
+    passengerData: WEBHOOK("passenger-data"),
+    bookingConfirm: WEBHOOK("booking-confirm")
 };
 
-// État global de la réservation
+// === État global de la réservation ===
 let bookingState = {
     selectedFlight: null,
     passengers: [],
@@ -16,7 +24,7 @@ let bookingState = {
     sessionId: 'web-' + Date.now()
 };
 
-// Éléments DOM
+// === Éléments DOM ===
 const chatContainer = document.getElementById('chatContainer');
 const messageInput = document.getElementById('messageInput');
 const sendButton = document.getElementById('sendButton');
@@ -38,7 +46,7 @@ messageInput.addEventListener('keydown', function(e) {
 
 messageInput.focus();
 
-// Ajouter un message au chat
+// === Affichage messages dans le chat ===
 function addMessage(content, isUser = false, isFlightResult = false) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${isUser ? 'user' : 'bot'}`;
