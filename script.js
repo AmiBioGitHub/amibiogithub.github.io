@@ -169,13 +169,24 @@ function displayFlightResults(response) {
     `;
 
     response.bestFlights.forEach((flight, index) => {
+        // Bloc retour si dispo
+        let retourHtml = '';
+        if (flight.inbound) {
+            retourHtml = `
+                <div style="font-size: 13px; color: #64748b; margin-top: 6px;">
+                    🕐 RETOUR: ${flight.inbound.departure || 'N/A'} → ${flight.inbound.arrival || 'N/A'} | ⏱️ ${flight.inbound.duration || 'N/A'}
+                </div>
+            `;
+        }
+
         flightsHtml += `
             <div style="background: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin-bottom: 12px; cursor: pointer; transition: all 0.2s;" 
                  onclick="selectFlight(${index}, ${JSON.stringify(flight.originalAmadeusData || flight).replace(/"/g, '&quot;')})">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                     <div style="flex: 1;">
                         <div style="font-size: 13px; color: #64748b; margin-bottom: 8px;">
-                            🕐 ALLER: ${flight.schedule?.departure || 'N/A'} → ${flight.schedule?.arrival || 'N/A'} | ⏱️ ${flight.schedule?.duration || 'N/A'}
+                            🕐 ALLER: ${flight.outbound?.departure || flight.schedule?.departure || 'N/A'} → ${flight.outbound?.arrival || flight.schedule?.arrival || 'N/A'} | ⏱️ ${flight.outbound?.duration || flight.schedule?.duration || 'N/A'}
+                            ${retourHtml}
                         </div>
                     </div>
                     <div style="text-align: right;">
@@ -311,8 +322,16 @@ function simulateFlightSearch(message) {
             aiModel: 'demo-mode'
         },
         bestFlights: [
-            { schedule: { departure: '08:30', arrival: '01:15+1', duration: '15h45m' }, price: { amount: 750, currency: 'EUR' } },
-            { schedule: { departure: '14:20', arrival: '09:45+1', duration: '17h25m' }, price: { amount: 680, currency: 'EUR' } }
+            { 
+                outbound: { departure: '08:30', arrival: '01:15+1', duration: '15h45m' }, 
+                inbound: { departure: '10:00', arrival: '18:30', duration: '10h30m' },
+                price: { amount: 750, currency: 'EUR' } 
+            },
+            { 
+                outbound: { departure: '14:20', arrival: '09:45+1', duration: '17h25m' }, 
+                inbound: { departure: '22:00', arrival: '06:30+1', duration: '8h30m' },
+                price: { amount: 680, currency: 'EUR' } 
+            }
         ]
     };
 }
