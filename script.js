@@ -13,7 +13,7 @@ const APP_VERSION = {
 // === Configuration Webhooks - URLs DE PRODUCTION n8n ===
 
 // Sous-domaine configurable (changer ici seulement 👇)
-const N8N_SUBDOMAIN = "amibio.app.n8n.cloud";
+const N8N_SUBDOMAIN = "44a3a42b59cf1a057677b52c66d40d12.serveo.net";
 
 // Générateur d'URL webhook
 const WEBHOOK = (path) => `https://${N8N_SUBDOMAIN}/webhook/${path}`;
@@ -426,8 +426,44 @@ async function selectFlight(flightIndex, flightData) {
 function showPassengerForm() {
     debugLog('👤 Showing passenger form', 'info');
     
-    const flightInfo = bookingState.selectedFlightData?.selectedFlight || {};
+    // Récupérer les données depuis les bonnes sources
+    const flightInfo = bookingState.selectedFlight || {}; // Données Amadeus originales
     const pricing = bookingState.pricing || {};
+    const selectionData = bookingState.selectedFlightData || {};
+    
+    // Debug des données disponibles
+    debugLog('📊 Flight info available:', 'info');
+    console.log('selectedFlight:', bookingState.selectedFlight);
+    console.log('pricing:', bookingState.pricing);
+    console.log('selectedFlightData:', bookingState.selectedFlightData);
+    
+    // Extraire les informations de compagnie
+    let airlineName = 'Compagnie non identifiée';
+    let airlineCode = '';
+    
+    // Essayer différentes sources pour la compagnie
+    if (flightInfo.validatingAirlineCodes && flightInfo.validatingAirlineCodes[0]) {
+        airlineCode = flightInfo.validatingAirlineCodes[0];
+        airlineName = getAirlineName(airlineCode);
+    } else if (selectionData.selectedFlight?.airline?.name) {
+        airlineName = selectionData.selectedFlight.airline.name;
+        airlineCode = selectionData.selectedFlight.airline.code || '';
+    }
+    
+    // Extraire le prix
+    let priceDisplay = 'N/A EUR';
+    if (pricing.totalPrice && pricing.currency) {
+        priceDisplay = `${pricing.totalPrice} ${pricing.currency}`;
+    } else if (pricing.basePrice && pricing.currency) {
+        priceDisplay = `${pricing.basePrice} ${pricing.currency}`;
+    } else if (flightInfo.price?.total && flightInfo.price?.currency) {
+        priceDisplay = `${flightInfo.price.total} ${flightInfo.price.currency}`;
+    }
+    
+    // Nombre de passagers
+    const passengerCount = selectionData.passengers || 1;
+    
+    debugLog(`📋 Summary data: ${airlineName} (${airlineCode}) - ${priceDisplay} - ${passengerCount} pax`, 'info');
     
     const formHtml = `
         <div class="passenger-form">
@@ -435,15 +471,15 @@ function showPassengerForm() {
                 <h4>📋 Résumé de votre réservation</h4>
                 <div class="summary-item">
                     <span>Vol sélectionné:</span>
-                    <strong>${flightInfo.airline?.name || 'Compagnie'}</strong>
+                    <strong>${airlineName}${airlineCode ? ` (${airlineCode})` : ''}</strong>
                 </div>
                 <div class="summary-item">
                     <span>Prix estimé:</span>
-                    <strong>${pricing.totalPrice || pricing.basePrice || 'N/A'} ${pricing.currency || 'EUR'}</strong>
+                    <strong>${priceDisplay}</strong>
                 </div>
                 <div class="summary-item">
                     <span>Passagers:</span>
-                    <strong>${bookingState.selectedFlightData?.passengers || 1} adulte(s)</strong>
+                    <strong>${passengerCount} adulte(s)</strong>
                 </div>
             </div>
 
@@ -556,6 +592,20 @@ function showPassengerForm() {
             debugLog('📝 Passenger form initialized', 'success');
         }
     }, 100);
+}
+
+// Fonction helper pour obtenir le nom de la compagnie
+function getAirlineName(code) {
+    const airlines = {
+        'AF': 'Air France', 'LH': 'Lufthansa', 'BA': 'British Airways',
+        'KL': 'KLM', 'SN': 'Brussels Airlines', 'FR': 'Ryanair',
+        'U2': 'easyJet', 'EK': 'Emirates', 'QR': 'Qatar Airways',
+        'AZ': 'ITA Airways', 'IB': 'Iberia', 'LX': 'Swiss',
+        'OS': 'Austrian Airlines', 'SK': 'SAS', 'AY': 'Finnair',
+        'TP': 'TAP Portugal', 'EI': 'Aer Lingus', 'VY': 'Vueling',
+        'W6': 'Wizz Air', 'EW': 'Eurowings', 'HV': 'Transavia'
+    };
+    return airlines[code] || `${code} Airlines`;
 }
 
 // === Validation du formulaire ===
