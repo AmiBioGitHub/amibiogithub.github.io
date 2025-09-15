@@ -912,7 +912,7 @@ function showBookingConfirmation() {
     debugLog('🎉 Showing booking confirmation', 'info');
     
     const passenger = bookingState.passengers[0];
-    const pricing = bookingState.pricing;
+    const pricing = bookingState.pricing || {};
     const flightInfo = bookingState.selectedFlightData?.selectedFlight;
     
     const confirmationHtml = `
@@ -929,7 +929,7 @@ function showBookingConfirmation() {
                 </div>
                 <div class="summary-item">
                     <span>Prix total:</span>
-                    <strong>${pricing.totalPrice} ${pricing.currency}</strong>
+                    <strong>${pricing.totalPrice || pricing.basePrice || 'Prix non disponible'} ${pricing.currency || 'EUR'}</strong>
                 </div>
             </div>
             
