@@ -1,7 +1,7 @@
 // === Configuration Webhooks - URLs DE PRODUCTION n8n ===
 
 // Sous-domaine configurable (changer ici seulement 👇)
-const N8N_SUBDOMAIN = "https://amibio.app.n8n.cloud";
+const N8N_SUBDOMAIN = "amibio.app.n8n.cloud";
 
 // Générateur d'URL webhook
 const WEBHOOK = (path) => `https://${N8N_SUBDOMAIN}/webhook/${path}`;
