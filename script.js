@@ -1,7 +1,7 @@
 // === Configuration Webhooks - URLs DE PRODUCTION n8n ===
 
 // Sous-domaine configurable (changer ici seulement 👇)
-const N8N_SUBDOMAIN = "1035635e0a05e507ba49faa8b5cb40ae.serveo.net";
+const N8N_SUBDOMAIN = "5uxf5dpzjr.eu.loclx.io";
 
 // Générateur d'URL webhook
 const WEBHOOK = (path) => `https://${N8N_SUBDOMAIN}/webhook/${path}`;
