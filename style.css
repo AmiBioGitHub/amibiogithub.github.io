@@ -1,3 +1,8 @@
+/* ===== VERSION INFO ===== */
+/* Version: 2.1.0 */
+/* Last Updated: 2024-12-19 14:30:00 */
+/* Features: Version tracking, Debug console, Enhanced UI */
+
 * {
     margin: 0;
     padding: 0;
@@ -67,6 +72,245 @@ body {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.6; }
 }
+
+/* ===== VERSION BADGE & PANEL ===== */
+
+.version-badge {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+}
+
+.version-badge:hover {
+    background: rgba(0, 0, 0, 0.9);
+    transform: translateY(-2px);
+}
+
+.version-indicator {
+    width: 6px;
+    height: 6px;
+    background: #10b981;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+}
+
+.version-panel {
+    position: fixed;
+    top: 60px;
+    right: 20px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    z-index: 999;
+    width: 280px;
+    transform: translateY(-10px);
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+    border: 1px solid #e5e7eb;
+}
+
+.version-panel.visible {
+    transform: translateY(0);
+    opacity: 1;
+    visibility: visible;
+}
+
+.version-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    border-bottom: 1px solid #e5e7eb;
+    background: #f8fafc;
+    border-radius: 12px 12px 0 0;
+}
+
+.version-header h4 {
+    margin: 0;
+    color: #1e293b;
+    font-size: 14px;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    color: #6b7280;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 0;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.close-btn:hover {
+    background: #e5e7eb;
+    color: #374151;
+}
+
+.version-content {
+    padding: 15px;
+}
+
+.version-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    font-size: 13px;
+}
+
+.version-item:last-child {
+    margin-bottom: 0;
+}
+
+.version-label {
+    color: #6b7280;
+    font-weight: 500;
+}
+
+.version-value {
+    color: #1e293b;
+    font-weight: 600;
+    font-family: 'Monaco', 'Menlo', monospace;
+}
+
+.version-actions {
+    padding: 15px;
+    border-top: 1px solid #e5e7eb;
+    display: flex;
+    gap: 8px;
+}
+
+.test-btn, .reload-btn {
+    flex: 1;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.test-btn {
+    background: #3b82f6;
+    color: white;
+}
+
+.test-btn:hover {
+    background: #2563eb;
+}
+
+.reload-btn {
+    background: #6b7280;
+    color: white;
+}
+
+.reload-btn:hover {
+    background: #4b5563;
+}
+
+/* ===== DEBUG CONSOLE ===== */
+
+.debug-console {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #1f2937;
+    color: white;
+    z-index: 998;
+    max-height: 40px;
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+.debug-console.expanded {
+    max-height: 300px;
+}
+
+.debug-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 20px;
+    background: #111827;
+    cursor: pointer;
+    border-top: 1px solid #374151;
+}
+
+.debug-header:hover {
+    background: #1f2937;
+}
+
+.debug-toggle {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 0;
+}
+
+.debug-content {
+    height: 260px;
+    overflow: hidden;
+}
+
+.debug-log {
+    padding: 10px 20px;
+    height: 100%;
+    overflow-y: auto;
+    font-family: 'Monaco', 'Menlo', monospace;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.debug-entry {
+    margin-bottom: 4px;
+    padding: 2px 0;
+}
+
+.debug-entry.debug-info {
+    color: #93c5fd;
+}
+
+.debug-entry.debug-success {
+    color: #86efac;
+}
+
+.debug-entry.debug-warning {
+    color: #fde047;
+}
+
+.debug-entry.debug-error {
+    color: #fca5a5;
+}
+
+.debug-time {
+    color: #6b7280;
+    margin-right: 8px;
+}
+
+/* ===== CHAT STYLES (existing) ===== */
 
 .chat-container {
     height: 500px;
@@ -279,7 +523,7 @@ body {
     border: 1px solid #fca5a5;
 }
 
-/* === STYLES POUR LE FORMULAIRE PASSAGER === */
+/* ===== STYLES POUR LE FORMULAIRE PASSAGER ===== */
 
 .passenger-form {
     background: white;
@@ -477,7 +721,7 @@ body {
     100% { transform: scale(1); opacity: 1; }
 }
 
-/* === RESPONSIVE === */
+/* ===== RESPONSIVE ===== */
 
 @media (max-width: 768px) {
     body { 
@@ -525,5 +769,31 @@ body {
     
     .passenger-form {
         padding: 15px;
+    }
+    
+    .version-badge {
+        top: 10px;
+        right: 10px;
+        font-size: 11px;
+        padding: 6px 10px;
+    }
+    
+    .version-panel {
+        top: 50px;
+        right: 10px;
+        left: 10px;
+        width: auto;
+    }
+    
+    .debug-console {
+        font-size: 11px;
+    }
+    
+    .debug-header {
+        padding: 8px 15px;
+    }
+    
+    .debug-log {
+        padding: 8px 15px;
     }
 }
