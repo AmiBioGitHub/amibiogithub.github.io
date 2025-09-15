@@ -7,6 +7,11 @@
     <meta name="description" content="Bot de recherche de vols avec intelligence artificielle. Trouvez les meilleurs vols en langage naturel.">
     <meta name="keywords" content="vol, avion, voyage, IA, intelligence artificielle, booking, réservation">
     
+    <!-- Version Info -->
+    <meta name="version" content="2.1.0">
+    <meta name="build-date" content="2024-12-19">
+    <meta name="build-time" content="14:30:00">
+    
     <!-- Favicon -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✈️</text></svg>">
     
@@ -15,13 +20,57 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
-    <!-- CSS séparé -->
-    <link rel="stylesheet" href="style.css">
+    <!-- CSS avec versioning -->
+    <link rel="stylesheet" href="style.css?v=2.1.0">
 </head>
 <body>
+    <!-- Version Badge -->
+    <div id="versionBadge" class="version-badge" onclick="toggleVersionInfo()">
+        <span>v2.1.0</span>
+        <div class="version-indicator"></div>
+    </div>
+
+    <!-- Version Info Panel -->
+    <div id="versionPanel" class="version-panel">
+        <div class="version-header">
+            <h4>📊 Informations de Version</h4>
+            <button onclick="toggleVersionInfo()" class="close-btn">✕</button>
+        </div>
+        <div class="version-content">
+            <div class="version-item">
+                <span class="version-label">HTML:</span>
+                <span class="version-value" id="htmlVersion">v2.1.0</span>
+            </div>
+            <div class="version-item">
+                <span class="version-label">CSS:</span>
+                <span class="version-value" id="cssVersion">Chargement...</span>
+            </div>
+            <div class="version-item">
+                <span class="version-label">JavaScript:</span>
+                <span class="version-value" id="jsVersion">Chargement...</span>
+            </div>
+            <div class="version-item">
+                <span class="version-label">Build:</span>
+                <span class="version-value">2024-12-19 14:30:00</span>
+            </div>
+            <div class="version-item">
+                <span class="version-label">Session:</span>
+                <span class="version-value" id="sessionInfo">-</span>
+            </div>
+            <div class="version-item">
+                <span class="version-label">API Status:</span>
+                <span class="version-value" id="apiStatus">🔄 Test en cours...</span>
+            </div>
+        </div>
+        <div class="version-actions">
+            <button onclick="testAPIConnection()" class="test-btn">🔍 Tester API</button>
+            <button onclick="reloadPage()" class="reload-btn">🔄 Recharger</button>
+        </div>
+    </div>
+
     <div class="container">
         <div class="header">
-            <h1>✈️ AI Flight Search V 11:56</h1>
+            <h1>✈️ AI Flight Search</h1>
             <p>Recherchez vos vols avec l'intelligence artificielle</p>
             <div class="status-indicator">
                 <div class="status-dot"></div>
@@ -83,7 +132,98 @@
         </div>
     </div>
 
-    <!-- JS séparé -->
-    <script src="script.js"></script>
+    <!-- Console de debug (développement) -->
+    <div id="debugConsole" class="debug-console">
+        <div class="debug-header">
+            <span>🐛 Debug Console</span>
+            <button onclick="toggleDebugConsole()" class="debug-toggle">▼</button>
+        </div>
+        <div class="debug-content" id="debugContent">
+            <div class="debug-log" id="debugLog"></div>
+        </div>
+    </div>
+
+    <!-- JS avec versioning -->
+    <script src="script.js?v=2.1.0"></script>
+    
+    <!-- Version checker -->
+    <script>
+        // Vérifier les versions au chargement
+        document.addEventListener('DOMContentLoaded', function() {
+            checkVersions();
+            initializeVersionInfo();
+        });
+        
+        function checkVersions() {
+            // Version HTML depuis meta tag
+            const htmlVersion = document.querySelector('meta[name="version"]')?.content || 'Unknown';
+            document.getElementById('htmlVersion').textContent = `v${htmlVersion}`;
+            
+            // Essayer de détecter la version CSS
+            detectCSSVersion();
+            
+            // La version JS sera définie dans script.js
+            // Session info sera mise à jour par script.js
+        }
+        
+        function detectCSSVersion() {
+            // Rechercher dans les stylesheets
+            const styleSheets = Array.from(document.styleSheets);
+            const cssLink = document.querySelector('link[href*="style.css"]');
+            
+            if (cssLink && cssLink.href.includes('v=')) {
+                const version = cssLink.href.match(/v=([^&]*)/)?.[1] || 'Unknown';
+                document.getElementById('cssVersion').textContent = `v${version}`;
+            } else {
+                document.getElementById('cssVersion').textContent = 'v2.1.0 (inferred)';
+            }
+        }
+        
+        function initializeVersionInfo() {
+            // Cette fonction sera étendue par script.js
+            console.log('🔧 Version system initialized');
+        }
+        
+        function toggleVersionInfo() {
+            const panel = document.getElementById('versionPanel');
+            panel.classList.toggle('visible');
+        }
+        
+        function reloadPage() {
+            window.location.reload();
+        }
+        
+        function toggleDebugConsole() {
+            const console = document.getElementById('debugConsole');
+            const content = document.getElementById('debugContent');
+            const toggle = document.querySelector('.debug-toggle');
+            
+            console.classList.toggle('expanded');
+            if (console.classList.contains('expanded')) {
+                toggle.textContent = '▲';
+            } else {
+                toggle.textContent = '▼';
+            }
+        }
+        
+        // Fonction pour ajouter des logs de debug
+        window.debugLog = function(message, type = 'info') {
+            const log = document.getElementById('debugLog');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.className = `debug-entry debug-${type}`;
+            logEntry.innerHTML = `<span class="debug-time">${timestamp}</span> ${message}`;
+            log.appendChild(logEntry);
+            log.scrollTop = log.scrollHeight;
+            
+            // Garder seulement les 50 derniers logs
+            while (log.children.length > 50) {
+                log.removeChild(log.firstChild);
+            }
+        };
+        
+        // Log initial
+        debugLog('🚀 Application initialized', 'success');
+    </script>
 </body>
 </html>
