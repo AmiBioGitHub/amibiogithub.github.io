@@ -1026,7 +1026,7 @@ async function handlePassengerFormSubmit(event) {
 }
 
 // === Confirmation de réservation ===
-function showBookingConfirmation() {
+/*function showBookingConfirmation() {
     debugLog('🎉 Showing booking confirmation', 'info');
     
     const passenger = bookingState.passengers[0];
@@ -1048,6 +1048,101 @@ function showBookingConfirmation() {
                 <div class="summary-item">
                     <span>Prix total:</span>
                       <strong>${finalPrice}</strong>
+                </div>
+            </div>
+            
+            <div style="text-align: center; margin: 20px 0;">
+                <p style="margin-bottom: 15px;">En cliquant sur "Confirmer la réservation", vous acceptez nos conditions générales.</p>
+                <p style="font-size: 14px; color: #6b7280;">Cette réservation est une simulation. Aucun paiement ne sera effectué.</p>
+            </div>
+            
+            <div class="button-group">
+                <button type="button" class="form-button secondary" onclick="cancelBooking()">
+                    Annuler
+                </button>
+                <button type="button" class="form-button" onclick="confirmBooking()">
+                    Confirmer la réservation
+                </button>
+            </div>
+        </div>
+    `;
+    
+    addMessage(confirmationHtml, false, true);
+}*/
+
+function showBookingConfirmation() {
+    debugLog('🎉 Showing booking confirmation', 'info');
+    
+    const passenger = bookingState.passengers[0];
+    const pricing = bookingState.pricing || {};
+    const flightInfo = bookingState.selectedFlightData?.selectedFlight;
+    
+    // DEBUG: Afficher toutes les données disponibles
+    debugLog('📊 Debug pricing data:', 'info');
+    console.log('bookingState.pricing:', bookingState.pricing);
+    console.log('bookingState.selectedFlight:', bookingState.selectedFlight);
+    console.log('bookingState.selectedFlightData:', bookingState.selectedFlightData);
+    
+    // Logique de prix avec plus de sources
+    let finalPrice = 'Prix à confirmer';
+    
+    // Source 1: pricing.totalPrice
+    if (pricing.totalPrice && pricing.currency) {
+        finalPrice = `${pricing.totalPrice} ${pricing.currency}`;
+        debugLog(`💰 Prix depuis pricing.totalPrice: ${finalPrice}`, 'success');
+    }
+    // Source 2: pricing.basePrice
+    else if (pricing.basePrice && pricing.currency) {
+        finalPrice = `${pricing.basePrice} ${pricing.currency}`;
+        debugLog(`💰 Prix depuis pricing.basePrice: ${finalPrice}`, 'success');
+    }
+    // Source 3: selectedFlight original (données Amadeus)
+    else if (bookingState.selectedFlight?.price?.total) {
+        finalPrice = `${bookingState.selectedFlight.price.total} ${bookingState.selectedFlight.price.currency || 'EUR'}`;
+        debugLog(`💰 Prix depuis selectedFlight.price: ${finalPrice}`, 'success');
+    }
+    // Source 4: données de sélection
+    else if (bookingState.selectedFlightData?.pricing?.totalPrice) {
+        finalPrice = `${bookingState.selectedFlightData.pricing.totalPrice} ${bookingState.selectedFlightData.pricing.currency || 'EUR'}`;
+        debugLog(`💰 Prix depuis selectedFlightData.pricing: ${finalPrice}`, 'success');
+    }
+    // Source 5: fallback avec recherche dans toutes les propriétés
+    else {
+        debugLog('⚠️ Aucune source de prix trouvée, recherche approfondie...', 'warning');
+        
+        // Chercher dans tous les objets
+        const allPossiblePrices = [
+            pricing?.total,
+            pricing?.grandTotal,
+            flightInfo?.price?.total,
+            flightInfo?.price?.grandTotal,
+            bookingState.selectedFlight?.price?.grandTotal
+        ].filter(price => price && !isNaN(parseFloat(price)));
+        
+        if (allPossiblePrices.length > 0) {
+            const firstValidPrice = allPossiblePrices[0];
+            finalPrice = `${firstValidPrice} EUR`;
+            debugLog(`💰 Prix trouvé par recherche: ${finalPrice}`, 'success');
+        } else {
+            debugLog('❌ Aucun prix trouvé dans toutes les sources', 'error');
+        }
+    }
+    
+    const confirmationHtml = `
+        <div class="passenger-form">
+            <div class="booking-summary">
+                <h4>🎉 Confirmation de réservation</h4>
+                <div class="summary-item">
+                    <span>Passager:</span>
+                    <strong>${passenger.name.firstName} ${passenger.name.lastName}</strong>
+                </div>
+                <div class="summary-item">
+                    <span>Email:</span>
+                    <strong>${bookingState.contact.email}</strong>
+                </div>
+                <div class="summary-item">
+                    <span>Prix total:</span>
+                    <strong>${finalPrice}</strong>
                 </div>
             </div>
             
