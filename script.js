@@ -13,7 +13,7 @@ const APP_VERSION = {
 // === Configuration Webhooks - URLs DE PRODUCTION n8n ===
 
 // Sous-domaine configurable (changer ici seulement 👇)
-const N8N_SUBDOMAIN = "amibio.app.n8n.cloud";
+const N8N_SUBDOMAIN = "44a3a42b59cf1a057677b52c66d40d12.serveo.net";
 
 // Générateur d'URL webhook
 const WEBHOOK = (path) => `https://${N8N_SUBDOMAIN}/webhook/${path}`;
@@ -59,10 +59,16 @@ function initializeApp() {
     // Mettre à jour les informations de version
     updateVersionInfo();
     
-    // Test de connectivité initial
-    setTimeout(() => {
-        testAPIConnection();
-    }, 1000);
+    // Test de connectivité initial - DÉSACTIVÉ pour éviter les appels automatiques
+    // setTimeout(() => {
+    //     testAPIConnection();
+    // }, 1000);
+    
+    // Afficher un statut neutre au lieu de tester automatiquement
+    const statusElement = document.getElementById('apiStatus');
+    if (statusElement) {
+        statusElement.textContent = '⚪ Prêt pour test';
+    }
     
     // Afficher la version dans la console
     console.log(`%c✈️ AI Flight Search Bot v${APP_VERSION.js}`, 'color: #2196F3; font-size: 16px; font-weight: bold;');
