@@ -570,7 +570,27 @@ function showPassengerForm() {
             <form id="passengerForm">
                 <div class="form-section">
                     <h4>👤 Informations du passager</h4>
-                    
+                    <div style="margin-bottom: 15px; padding: 10px; background: #f0f9ff; border-radius: 8px; border: 1px solid #0ea5e9;">
+    <div style="font-size: 12px; color: #0369a1; margin-bottom: 8px; font-weight: 500;">🧪 Mode Test - Remplir automatiquement:</div>
+    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <button type="button" onclick="fillDummyPassenger('john')" 
+                style="background: #3b82f6; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer;">
+            👨 John Doe (BE)
+        </button>
+        <button type="button" onclick="fillDummyPassenger('marie')" 
+                style="background: #ec4899; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer;">
+            👩 Marie Dupont (FR)
+        </button>
+        <button type="button" onclick="fillDummyPassenger('test')" 
+                style="background: #10b981; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer;">
+            🧪 Test User (US)
+        </button>
+        <button type="button" onclick="clearForm()" 
+                style="background: #6b7280; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer;">
+            🗑️ Vider
+        </button>
+    </div>
+</div>
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Prénom <span class="required">*</span></label>
@@ -665,6 +685,7 @@ function showPassengerForm() {
         </div>
     `;
 
+
     addMessage(formHtml, false, true);
     
     // Attacher les event listeners au formulaire
@@ -676,6 +697,103 @@ function showPassengerForm() {
             debugLog('📝 Passenger form initialized', 'success');
         }
     }, 100);
+}
+
+
+// === Données dummy pour les tests ===
+const DUMMY_PASSENGERS = {
+    john: {
+        firstName: 'John',
+        lastName: 'Doe',
+        dateOfBirth: '1990-05-15',
+        gender: 'MALE',
+        passportNumber: 'AB123456',
+        passportExpiry: '2030-12-31',
+        nationality: 'BE',
+        email: 'john.doe@test.com',
+        phone: '+32 123 456 789'
+    },
+    marie: {
+        firstName: 'Marie',
+        lastName: 'Dupont',
+        dateOfBirth: '1985-08-22',
+        gender: 'FEMALE',
+        passportNumber: 'CD789012',
+        passportExpiry: '2029-06-15',
+        nationality: 'FR',
+        email: 'marie.dupont@test.com',
+        phone: '+33 987 654 321'
+    },
+    test: {
+        firstName: 'Test',
+        lastName: 'User',
+        dateOfBirth: '1995-01-01',
+        gender: 'MALE',
+        passportNumber: 'TEST123',
+        passportExpiry: '2028-12-31',
+        nationality: 'US',
+        email: 'test@example.com',
+        phone: '+1 555 123 4567'
+    }
+};
+
+// Fonction pour remplir automatiquement le formulaire
+function fillDummyPassenger(passengerKey) {
+    const passenger = DUMMY_PASSENGERS[passengerKey];
+    if (!passenger) {
+        debugLog(`⚠️ Dummy passenger '${passengerKey}' not found`, 'warning');
+        return;
+    }
+    
+    debugLog(`👤 Filling dummy data for: ${passenger.firstName} ${passenger.lastName}`, 'info');
+    
+    // Remplir tous les champs du formulaire
+    const form = document.getElementById('passengerForm');
+    if (!form) {
+        debugLog('❌ Passenger form not found', 'error');
+        return;
+    }
+    
+    // Remplir chaque champ
+    const fields = {
+        'firstName': passenger.firstName,
+        'lastName': passenger.lastName,
+        'dateOfBirth': passenger.dateOfBirth,
+        'gender': passenger.gender,
+        'passportNumber': passenger.passportNumber,
+        'passportExpiry': passenger.passportExpiry,
+        'nationality': passenger.nationality,
+        'email': passenger.email,
+        'phone': passenger.phone
+    };
+    
+    Object.entries(fields).forEach(([fieldName, value]) => {
+        const field = form.querySelector(`[name="${fieldName}"]`);
+        if (field) {
+            field.value = value;
+            // Déclencher l'événement pour la validation
+            field.dispatchEvent(new Event('input', { bubbles: true }));
+            field.dispatchEvent(new Event('blur', { bubbles: true }));
+        }
+    });
+    
+    debugLog('✅ Dummy passenger data filled successfully', 'success');
+}
+
+// Fonction pour vider le formulaire
+function clearForm() {
+    const form = document.getElementById('passengerForm');
+    if (form) {
+        form.reset();
+        // Nettoyer les erreurs de validation
+        form.querySelectorAll('.error').forEach(field => {
+            field.classList.remove('error');
+        });
+        form.querySelectorAll('.form-error').forEach(error => {
+            error.remove();
+        });
+        debugLog('🗑️ Form cleared', 'info');
+    }
 }
 
 // Fonction helper pour obtenir le nom de la compagnie
