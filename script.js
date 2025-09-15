@@ -463,6 +463,88 @@ function showPassengerForm() {
     // Nombre de passagers
     const passengerCount = selectionData.passengers || 1;
     
+    // NOUVEAU: Extraire les détails de vol (horaires, dates, escales)
+    let flightDetails = '';
+    
+    try {
+        const itineraries = flightInfo.itineraries || [];
+        
+        itineraries.forEach((itinerary, index) => {
+            const segments = itinerary.segments || [];
+            if (segments.length === 0) return;
+            
+            const firstSegment = segments[0];
+            const lastSegment = segments[segments.length - 1];
+            const stops = segments.length - 1;
+            
+            // Type de vol (aller/retour)
+            const flightType = index === 0 ? 'ALLER' : 'RETOUR';
+            
+            // Dates et horaires
+            let departureInfo = 'N/A';
+            let arrivalInfo = 'N/A';
+            
+            if (firstSegment?.departure?.at) {
+                const depDate = new Date(firstSegment.departure.at);
+                const depDateStr = depDate.toLocaleDateString('fr-FR');
+                const depTimeStr = depDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+                departureInfo = `${depDateStr} à ${depTimeStr}`;
+            }
+            
+            if (lastSegment?.arrival?.at) {
+                const arrDate = new Date(lastSegment.arrival.at);
+                const arrDateStr = arrDate.toLocaleDateString('fr-FR');
+                const arrTimeStr = arrDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+                arrivalInfo = `${arrDateStr} à ${arrTimeStr}`;
+            }
+            
+            // Aéroports
+            const originAirport = firstSegment?.departure?.iataCode || 'N/A';
+            const destinationAirport = lastSegment?.arrival?.iataCode || 'N/A';
+            
+            // Durée
+            let duration = 'N/A';
+            if (itinerary.duration && itinerary.duration.startsWith('PT')) {
+                duration = itinerary.duration.replace('PT', '').replace('H', 'h').replace('M', 'm');
+            }
+            
+            // Escales
+            let stopsText = stops === 0 ? 'Direct' : `${stops} escale(s)`;
+            
+            flightDetails += `
+                <div class="summary-item">
+                    <span>${flightType}:</span>
+                    <strong>${originAirport} → ${destinationAirport}</strong>
+                </div>
+                <div class="summary-item">
+                    <span>Départ:</span>
+                    <strong>${departureInfo}</strong>
+                </div>
+                <div class="summary-item">
+                    <span>Arrivée:</span>
+                    <strong>${arrivalInfo}</strong>
+                </div>
+                <div class="summary-item">
+                    <span>Durée:</span>
+                    <strong>${duration} • ${stopsText}</strong>
+                </div>
+            `;
+            
+            if (index < itineraries.length - 1) {
+                flightDetails += '<div style="margin: 10px 0; border-bottom: 1px solid #e5e7eb;"></div>';
+            }
+        });
+        
+    } catch (error) {
+        debugLog(`⚠️ Error extracting flight details: ${error.message}`, 'warning');
+        flightDetails = `
+            <div class="summary-item">
+                <span>Détails vol:</span>
+                <strong>Informations non disponibles</strong>
+            </div>
+        `;
+    }
+    
     debugLog(`📋 Summary data: ${airlineName} (${airlineCode}) - ${priceDisplay} - ${passengerCount} pax`, 'info');
     
     const formHtml = `
@@ -470,11 +552,13 @@ function showPassengerForm() {
             <div class="booking-summary">
                 <h4>📋 Résumé de votre réservation</h4>
                 <div class="summary-item">
-                    <span>Vol sélectionné:</span>
+                    <span>Compagnie:</span>
                     <strong>${airlineName}${airlineCode ? ` (${airlineCode})` : ''}</strong>
                 </div>
+                ${flightDetails}
+                <div style="margin: 10px 0; border-bottom: 1px solid #e5e7eb;"></div>
                 <div class="summary-item">
-                    <span>Prix estimé:</span>
+                    <span>Prix total:</span>
                     <strong>${priceDisplay}</strong>
                 </div>
                 <div class="summary-item">
