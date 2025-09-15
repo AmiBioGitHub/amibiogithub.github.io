@@ -1047,7 +1047,7 @@ function showBookingConfirmation() {
                 </div>
                 <div class="summary-item">
                     <span>Prix total:</span>
-                    <strong>${pricing.totalPrice || pricing.basePrice || 'Prix non disponible'} ${pricing.currency || 'EUR'}</strong>
+                      <strong>${finalPrice}</strong>
                 </div>
             </div>
             
