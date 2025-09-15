@@ -18,10 +18,12 @@ const BOOKING_WEBHOOKS = {
 // === État global de la réservation ===
 let bookingState = {
     selectedFlight: null,
+    selectedFlightData: null,
     passengers: [],
     contact: {},
     currentStep: 'search',
-    sessionId: 'web-' + Date.now()
+    sessionId: 'web-' + Date.now(),
+    pricing: null
 };
 
 // === Éléments DOM ===
@@ -30,21 +32,35 @@ const messageInput = document.getElementById('messageInput');
 const sendButton = document.getElementById('sendButton');
 const typingIndicator = document.getElementById('typingIndicator');
 
-// Auto-resize textarea
-messageInput.addEventListener('input', function() {
-    this.style.height = 'auto';
-    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+// === Initialisation ===
+document.addEventListener('DOMContentLoaded', function() {
+    setupEventListeners();
+    messageInput.focus();
 });
 
-// Envoyer avec Entrée
-messageInput.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendMessage();
-    }
-});
+function setupEventListeners() {
+    // Auto-resize textarea
+    messageInput.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+    });
 
-messageInput.focus();
+    // Envoyer avec Entrée
+    messageInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    });
+}
+
+// === Gestion des exemples ===
+function fillExample(text) {
+    messageInput.value = text;
+    messageInput.focus();
+    messageInput.style.height = 'auto';
+    messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
+}
 
 // === Affichage messages dans le chat ===
 function addMessage(content, isUser = false, isFlightResult = false) {
@@ -126,21 +142,32 @@ function displayFlightResults(response) {
         }
 
         flightsHtml += `
-            <div style="background: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin-bottom: 12px; cursor: pointer;" 
+            <div style="background: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin-bottom: 12px; cursor: pointer; transition: all 0.3s ease;" 
+                 onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(0,0,0,0.1)'"
+                 onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 10px rgba(0,0,0,0.05)'"
                  onclick="selectFlight(${index}, ${JSON.stringify(flight.originalAmadeusData || flight).replace(/"/g, '&quot;')})">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                     <div style="flex: 1;">
+                        <div style="font-weight: 600; color: #1e293b; margin-bottom: 8px;">
+                            ${flight.airline?.name || 'Compagnie'} (${flight.airline?.code || ''})
+                        </div>
                         <div style="font-size: 13px; color: #64748b; margin-bottom: 8px;">
                             🕐 ALLER: ${flight.outbound?.departure || flight.schedule?.departure || 'N/A'} → ${flight.outbound?.arrival || flight.schedule?.arrival || 'N/A'} | ⏱️ ${flight.outbound?.duration || flight.schedule?.duration || 'N/A'}
                             ${retourHtml}
                         </div>
+                        <div style="font-size: 12px; color: #6b7280;">
+                            ${flight.route?.stopsText || (flight.route?.stops === 0 ? 'Direct' : flight.route?.stops + ' escale(s)' || '')}
+                        </div>
                     </div>
                     <div style="text-align: right;">
-                        <div style="font-weight: bold; color: #1e293b; margin-bottom: 4px;">
-                            Prix ${flight.price?.amount || 'N/A'} ${flight.price?.currency || 'EUR'}
+                        <div style="font-weight: bold; color: #1e293b; margin-bottom: 8px; font-size: 18px;">
+                            ${flight.price?.amount || 'N/A'} ${flight.price?.currency || 'EUR'}
                         </div>
-                        <button style="background: #10b981; color: white; border: none; padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: bold; cursor: pointer;">
-                            🎫 Réserver
+                        <div style="font-size: 12px; color: #10b981; margin-bottom: 8px;">
+                            ${flight.category || 'Standard'} • Score: ${flight.score || 'N/A'}/100
+                        </div>
+                        <button style="background: #10b981; color: white; border: none; padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: bold; cursor: pointer; transition: all 0.3s ease;">
+                            🎫 Sélectionner
                         </button>
                     </div>
                 </div>
@@ -205,30 +232,4 @@ async function selectFlight(flightIndex, flightData) {
     try {
         const response = await fetch(BOOKING_WEBHOOKS.flightSelect, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                flightIndex,
-                selectedFlight: flightData,
-                passengers: 1,
-                sessionId: bookingState.sessionId,
-                timestamp: new Date().toISOString()
-            })
-        });
-
-        showTyping(false);
-
-        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        const result = await response.json();
-
-        if (result && result.success) {
-            addMessage('✅ Vol confirmé. Étape suivante : informations passagers.', false);
-            bookingState.currentStep = 'passengers';
-        } else {
-            addMessage(`❌ ${result?.error || 'Erreur lors de la sélection du vol'}`, false);
-        }
-    } catch (error) {
-        showTyping(false);
-        console.error('❌ Erreur sélection vol:', error);
-        addMessage(`❌ Erreur de connexion: ${error.message}`, false);
-    }
-}
+            headers: { 'Content-
