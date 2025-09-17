@@ -548,22 +548,33 @@ async function confirmBooking() {
 // ====================
 
 function addMessage(content, isUser = false, isHtml = false) {
-    const chatBox = document.getElementById('chatBox');
-    const messageDiv = document.createElement('div');
+    const chatContainer = document.getElementById('chatContainer');
     
-    messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
-    
-    if (isHtml) {
-        messageDiv.innerHTML = content;
-    } else {
-        messageDiv.textContent = content;
-        if (!isUser) {
-            console.log('💬 bot:', content);
-        }
+    if (!chatContainer) {
+        console.error('Element chatContainer non trouvé');
+        return;
     }
     
-    chatBox.appendChild(messageDiv);
-    chatBox.scrollTop = chatBox.scrollHeight;
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${isUser ? 'user' : 'bot'}`;
+    
+    const avatarDiv = document.createElement('div');
+    avatarDiv.className = `avatar ${isUser ? 'user' : 'bot'}`;
+    avatarDiv.textContent = isUser ? '👤' : '🤖';
+    
+    const bubbleDiv = document.createElement('div');
+    bubbleDiv.className = 'message-bubble';
+    
+    if (isHtml) {
+        bubbleDiv.innerHTML = content;
+    } else {
+        bubbleDiv.textContent = content;
+    }
+    
+    messageDiv.appendChild(avatarDiv);
+    messageDiv.appendChild(bubbleDiv);
+    chatContainer.appendChild(messageDiv);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
 }
 
 function getScoreColor(score) {
