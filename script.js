@@ -1,5 +1,5 @@
-// Flight Bot - Interface Web JavaScript - Version Duffel Corrigée
-console.log('🚀 Flight Bot Interface démarrée - Version Duffel');
+// Flight Bot - Interface Web JavaScript - Version Corrigée
+console.log('Flight Bot Interface démarrée');
 
 // Configuration des APIs
 const API_BASE_URL = 'https://amibio.app.n8n.cloud/webhook';
@@ -15,19 +15,19 @@ let bookingState = {
     selectedFlight: null,
     passengers: [],
     contact: {},
-    currentStep: 'search', // search, select, passengers, confirm, completed
+    currentStep: 'search',
     sessionId: 'web-' + Date.now(),
     pricing: null
 };
 
 // ====================
-// FONCTIONS HELPERS ROBUSTES
+// FONCTIONS HELPERS
 // ====================
 
-// Fonction helper pour gérer les noms de passagers de façon robuste
+// Fonction helper pour gérer les noms de passagers
 function safeGetPassengerData(passenger, index = 0) {
     if (!passenger || typeof passenger !== 'object') {
-        console.warn(`⚠️ Passager ${index + 1} invalide:`, passenger);
+        console.warn(`Passager ${index + 1} invalide:`, passenger);
         return {
             firstName: 'Passager',
             lastName: `${index + 1}`,
@@ -37,31 +37,21 @@ function safeGetPassengerData(passenger, index = 0) {
         };
     }
 
-    // Toutes les variantes possibles de prénom
     const firstName = passenger.firstName || 
                      passenger.given_name || 
                      passenger.name?.firstName || 
-                     passenger.name?.given_name ||
-                     passenger.first_name ||
                      'Prénom';
 
-    // Toutes les variantes possibles de nom
     const lastName = passenger.lastName || 
                     passenger.family_name || 
                     passenger.name?.lastName || 
-                    passenger.name?.family_name ||
-                    passenger.last_name ||
                     'Nom';
 
-    // Autres données
     const dateOfBirth = passenger.dateOfBirth || 
                        passenger.born_on || 
-                       passenger.date_of_birth ||
                        '';
 
-    const gender = passenger.gender || 
-                   passenger.sex ||
-                   'MALE';
+    const gender = passenger.gender || 'MALE';
 
     return {
         firstName: firstName.toString().trim(),
@@ -72,11 +62,10 @@ function safeGetPassengerData(passenger, index = 0) {
     };
 }
 
-// Fonction helper pour gérer les prix de façon robuste
+// Fonction helper pour gérer les prix
 function safeGetPricing(flightData) {
-    console.log('📊 Debug pricing data:');
+    console.log('Debug pricing data:', flightData);
     
-    // Plusieurs sources possibles pour le prix
     const priceSources = [
         flightData?.price,
         flightData?.pricing,
@@ -89,16 +78,16 @@ function safeGetPricing(flightData) {
     let finalCurrency = 'EUR';
 
     for (const priceSource of priceSources) {
-        if (priceSource && (priceSource.total || priceSource.grandTotal)) {
-            finalPrice = priceSource.total || priceSource.grandTotal;
+        if (priceSource && (priceSource.total || priceSource.grandTotal || priceSource.amount)) {
+            finalPrice = priceSource.total || priceSource.grandTotal || priceSource.amount;
             finalCurrency = priceSource.currency || 'EUR';
-            console.log('💰 Prix depuis', priceSource.constructor?.name || 'source', ':', finalPrice, finalCurrency);
+            console.log('Prix trouvé depuis', priceSource.constructor?.name || 'source', ':', finalPrice, finalCurrency);
             break;
         }
     }
 
     if (!finalPrice) {
-        console.warn('⚠️ Aucun prix trouvé, utilisation prix par défaut');
+        console.warn('Aucun prix trouvé, utilisation prix par défaut');
         finalPrice = '0.00';
     }
 
@@ -107,6 +96,87 @@ function safeGetPricing(flightData) {
         currency: finalCurrency,
         formatted: `${parseFloat(finalPrice).toFixed(2)} ${finalCurrency}`
     };
+}
+
+// Fonction pour formater la durée
+function formatDuration(duration) {
+    if (!duration) return 'N/A';
+    
+    // Convertir P1DT7H10M en format lisible
+    if (duration.startsWith('P')) {
+        const dayMatch = duration.match(/(\d+)D/);
+        const hourMatch = duration.match(/(\d+)H/);
+        const minMatch = duration.match(/(\d+)M/);
+        
+        const days = dayMatch ? parseInt(dayMatch[1]) : 0;
+        const hours = hourMatch ? parseInt(hourMatch[1]) : 0;
+        const minutes = minMatch ? parseInt(minMatch[1]) : 0;
+        
+        const totalHours = days * 24 + hours;
+        return `${totalHours}h${minutes.toString().padStart(2, '0')}m`;
+    }
+    
+    // Format simple comme "15h30m"
+    if (duration.includes('h') || duration.includes('H')) {
+        return duration.toLowerCase();
+    }
+    
+    return duration;
+}
+
+// Fonction pour obtenir la couleur du score
+function getScoreColor(score) {
+    if (score >= 90) return '22c55e'; // Vert
+    if (score >= 80) return '3b82f6'; // Bleu
+    if (score >= 70) return 'f59e0b'; // Orange
+    return 'ef4444'; // Rouge
+}
+
+// ====================
+// GESTION DE L'INTERFACE
+// ====================
+
+function addMessage(content, isUser = false, isHtml = false) {
+    const chatContainer = document.getElementById('chatContainer');
+    
+    if (!chatContainer) {
+        console.error('Element chatContainer non trouvé');
+        return;
+    }
+    
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${isUser ? 'user' : 'bot'}`;
+    
+    const avatarDiv = document.createElement('div');
+    avatarDiv.className = `avatar ${isUser ? 'user' : 'bot'}`;
+    avatarDiv.textContent = isUser ? '👤' : '🤖';
+    
+    const bubbleDiv = document.createElement('div');
+    bubbleDiv.className = 'message-bubble';
+    
+    if (isHtml) {
+        bubbleDiv.innerHTML = content;
+    } else {
+        bubbleDiv.textContent = content;
+        if (!isUser) {
+            console.log('bot:', content);
+        }
+    }
+    
+    messageDiv.appendChild(avatarDiv);
+    messageDiv.appendChild(bubbleDiv);
+    chatContainer.appendChild(messageDiv);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+}
+
+function fillExample(text) {
+    const messageInput = document.getElementById('userMessage');
+    if (messageInput) {
+        messageInput.value = text;
+        messageInput.focus();
+        messageInput.style.height = 'auto';
+        messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
+    }
 }
 
 // ====================
@@ -121,7 +191,7 @@ async function searchFlights() {
         return;
     }
 
-    console.log('🔍 Recherche:', userMessage);
+    console.log('Recherche:', userMessage);
     addMessage(userMessage, true);
     addMessage('Recherche en cours...', false);
 
@@ -138,7 +208,7 @@ async function searchFlights() {
         });
 
         const data = await response.json();
-        console.log('📡 Réponse recherche:', data);
+        console.log('Réponse recherche:', data);
 
         if (data.success && data.bestFlights && data.bestFlights.length > 0) {
             displayFlightResults(data);
@@ -151,11 +221,10 @@ async function searchFlights() {
             }
         }
 
-        // Réinitialiser le champ
         document.getElementById('userMessage').value = '';
 
     } catch (error) {
-        console.error('💥 Erreur recherche:', error);
+        console.error('Erreur recherche:', error);
         addMessage('❌ Erreur lors de la recherche. Veuillez réessayer.', false);
     }
 }
@@ -164,29 +233,40 @@ function displayFlightResults(data) {
     const flights = data.bestFlights || [];
     const searchParams = data.searchParams || {};
     
+    console.log('Search params:', searchParams);
+    console.log('Flights data:', flights);
+    
     let resultsHtml = `
         <div style="background: linear-gradient(135deg, #1e40af, #3b82f6); color: white; border-radius: 16px; padding: 20px; margin: 15px 0;">
             <div style="text-align: center; margin-bottom: 15px;">
                 <div style="font-size: 20px; font-weight: bold;">✈️ Vols Disponibles</div>
                 <div style="font-size: 14px; opacity: 0.9;">
-                    ${searchParams.originCity} → ${searchParams.destinationCity}
+                    ${searchParams.originCity || 'Origine'} → ${searchParams.destinationCity || 'Destination'}
                     ${searchParams.departureDate ? ` | ${new Date(searchParams.departureDate).toLocaleDateString('fr-FR')}` : ''}
                 </div>
             </div>
     `;
 
     flights.forEach((flight, index) => {
+        console.log(`Flight ${index + 1} data:`, flight);
+        
         const pricing = safeGetPricing(flight);
         const scheduleOut = flight.schedule || {};
         const scheduleIn = flight.inbound || null;
+        
+        // Score limité à 100
+        const score = Math.min(flight.score || 70, 100);
+        
+        console.log(`Flight ${index + 1} pricing:`, pricing);
+        console.log(`Flight ${index + 1} schedule:`, { scheduleOut, scheduleIn });
         
         resultsHtml += `
             <div style="background: white; color: #1f2937; border-radius: 12px; padding: 15px; margin: 10px 0;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                     <div style="font-weight: bold; font-size: 16px;">
                         ${flight.airline?.name || 'Compagnie inconnue'}
-                        <span style="background: #${getScoreColor(flight.score)}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px; margin-left: 8px;">
-                            ${flight.score || 70}/100
+                        <span style="background: #${getScoreColor(score)}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px; margin-left: 8px;">
+                            ${score}/100
                         </span>
                     </div>
                     <div style="font-size: 18px; font-weight: bold; color: #059669;">
@@ -195,8 +275,8 @@ function displayFlightResults(data) {
                 </div>
                 
                 <div style="font-size: 14px; color: #6b7280; margin-bottom: 12px;">
-                    <strong>🛫 ALLER:</strong> ${scheduleOut.departure} → ${scheduleOut.arrival} | ⏱️ ${scheduleOut.duration}
-                    ${scheduleIn ? `<br><strong>🛬 RETOUR:</strong> ${scheduleIn.departure} → ${scheduleIn.arrival} | ⏱️ ${scheduleIn.duration}` : ''}
+                    <strong>🛫 ALLER:</strong> ${scheduleOut.departure || 'N/A'} → ${scheduleOut.arrival || 'N/A'} | ⏱️ ${formatDuration(scheduleOut.duration)}
+                    ${scheduleIn ? `<br><strong>🛬 RETOUR:</strong> ${scheduleIn.departure || 'N/A'} → ${scheduleIn.arrival || 'N/A'} | ⏱️ ${formatDuration(scheduleIn.duration)}` : ''}
                 </div>
                 
                 <div style="text-align: center; margin-top: 12px;">
@@ -211,7 +291,6 @@ function displayFlightResults(data) {
 
     resultsHtml += '</div>';
     
-    // Stocker les données pour la sélection
     bookingState.searchResults = flights;
     bookingState.searchParams = searchParams;
     
@@ -223,7 +302,7 @@ function displayFlightResults(data) {
 // ====================
 
 async function selectFlight(flightIndex) {
-    console.log('✈️ Sélection du vol', flightIndex + 1);
+    console.log('Sélection du vol', flightIndex + 1);
     
     if (!bookingState.searchResults || !bookingState.searchResults[flightIndex]) {
         addMessage('❌ Erreur: vol non trouvé', false);
@@ -250,7 +329,7 @@ async function selectFlight(flightIndex) {
         });
 
         const data = await response.json();
-        console.log('📡 Réponse sélection:', data);
+        console.log('Réponse sélection:', data);
 
         if (data.success) {
             bookingState.selectedFlight = selectedFlight;
@@ -264,7 +343,7 @@ async function selectFlight(flightIndex) {
         }
 
     } catch (error) {
-        console.error('💥 Erreur sélection:', error);
+        console.error('Erreur sélection:', error);
         addMessage('❌ Erreur lors de la sélection. Veuillez réessayer.', false);
     }
 }
@@ -274,7 +353,7 @@ async function selectFlight(flightIndex) {
 // ====================
 
 function showPassengerForm() {
-    console.log('👤 Affichage formulaire passager');
+    console.log('Affichage formulaire passager');
     
     const pricing = safeGetPricing(bookingState.pricing || bookingState.selectedFlight);
     
@@ -353,9 +432,8 @@ function showPassengerForm() {
 }
 
 async function submitPassengerData() {
-    console.log('📝 Submitting passenger form');
+    console.log('Submitting passenger form');
     
-    // Récupération sécurisée des données du formulaire
     const formData = {
         firstName: document.getElementById('firstName')?.value?.trim() || '',
         lastName: document.getElementById('lastName')?.value?.trim() || '',
@@ -366,7 +444,6 @@ async function submitPassengerData() {
         passportNumber: document.getElementById('passportNumber')?.value?.trim() || ''
     };
 
-    // Validation côté client
     const errors = [];
     if (!formData.firstName) errors.push('Prénom requis');
     if (!formData.lastName) errors.push('Nom requis');
@@ -382,11 +459,9 @@ async function submitPassengerData() {
     }
 
     const passengerData = safeGetPassengerData(formData);
-    console.log('📋 Passenger data prepared:', passengerData.fullName);
+    console.log('Passenger data prepared:', passengerData.fullName);
 
     try {
-        console.log('📡 Sending passenger data to API...');
-        
         const response = await fetch(API_ENDPOINTS.passengerData, {
             method: 'POST',
             headers: {
@@ -395,7 +470,7 @@ async function submitPassengerData() {
             body: JSON.stringify({
                 sessionId: bookingState.sessionId,
                 flightId: bookingState.selectedFlight?.duffelData?.offerId || 'unknown',
-                passengers: [formData], // Utiliser formData original
+                passengers: [formData],
                 contact: {
                     email: formData.email,
                     phone: formData.phone
@@ -405,13 +480,10 @@ async function submitPassengerData() {
         });
 
         const data = await response.json();
-        console.log('📡 Réponse passager:', data);
+        console.log('Réponse passager:', data);
 
         if (data.success) {
-            console.log('✅ Passenger data validated successfully');
-            
-            // Stockage sécurisé des données validées
-            bookingState.passengers = [passengerData]; // Utiliser les données formatées
+            bookingState.passengers = [passengerData];
             bookingState.contact = {
                 email: formData.email,
                 phone: formData.phone
@@ -429,7 +501,7 @@ async function submitPassengerData() {
         }
 
     } catch (error) {
-        console.error('💥 Erreur passager:', error);
+        console.error('Erreur passager:', error);
         addMessage('❌ Erreur lors de la validation. Veuillez réessayer.', false);
     }
 }
@@ -439,7 +511,7 @@ async function submitPassengerData() {
 // ====================
 
 function showBookingConfirmation() {
-    console.log('🎉 Showing booking confirmation');
+    console.log('Showing booking confirmation');
     
     const pricing = safeGetPricing(bookingState.pricing || bookingState.selectedFlight);
     const passenger = safeGetPassengerData(bookingState.passengers?.[0]);
@@ -489,7 +561,7 @@ function showBookingConfirmation() {
 }
 
 async function confirmBooking() {
-    console.log('🎯 Confirming booking');
+    console.log('Confirming booking');
     
     addMessage('Finalisation de votre réservation...', false);
 
@@ -527,7 +599,7 @@ async function confirmBooking() {
         });
 
         const data = await response.json();
-        console.log('📡 Réponse confirmation:', data);
+        console.log('Réponse confirmation:', data);
 
         if (data.webResponse?.success) {
             bookingState.currentStep = 'completed';
@@ -538,7 +610,7 @@ async function confirmBooking() {
         }
 
     } catch (error) {
-        console.error('💥 Global error:', error);
+        console.error('Global error:', error);
         addMessage('❌ Erreur lors de la confirmation. Veuillez réessayer.', false);
     }
 }
@@ -547,45 +619,8 @@ async function confirmBooking() {
 // FONCTIONS UTILITAIRES
 // ====================
 
-function addMessage(content, isUser = false, isHtml = false) {
-    const chatContainer = document.getElementById('chatContainer');
-    
-    if (!chatContainer) {
-        console.error('Element chatContainer non trouvé');
-        return;
-    }
-    
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${isUser ? 'user' : 'bot'}`;
-    
-    const avatarDiv = document.createElement('div');
-    avatarDiv.className = `avatar ${isUser ? 'user' : 'bot'}`;
-    avatarDiv.textContent = isUser ? '👤' : '🤖';
-    
-    const bubbleDiv = document.createElement('div');
-    bubbleDiv.className = 'message-bubble';
-    
-    if (isHtml) {
-        bubbleDiv.innerHTML = content;
-    } else {
-        bubbleDiv.textContent = content;
-    }
-    
-    messageDiv.appendChild(avatarDiv);
-    messageDiv.appendChild(bubbleDiv);
-    chatContainer.appendChild(messageDiv);
-    chatContainer.scrollTop = chatContainer.scrollHeight;
-}
-
-function getScoreColor(score) {
-    if (score >= 90) return '22c55e'; // Vert
-    if (score >= 80) return '3b82f6'; // Bleu
-    if (score >= 70) return 'f59e0b'; // Orange
-    return 'ef4444'; // Rouge
-}
-
 function resetBooking() {
-    console.log('🔄 Reset booking state');
+    console.log('Reset booking state');
     bookingState = {
         selectedFlight: null,
         passengers: [],
@@ -599,21 +634,29 @@ function resetBooking() {
 }
 
 function downloadTicket(confirmationNumber) {
-    console.log('📄 Download ticket:', confirmationNumber);
+    console.log('Download ticket:', confirmationNumber);
     addMessage(`📄 Fonction de téléchargement à implémenter pour: ${confirmationNumber}`, false);
 }
 
-// Gestion de l'événement Enter
+// ====================
+// INITIALISATION
+// ====================
+
 document.addEventListener('DOMContentLoaded', function() {
     const userMessageInput = document.getElementById('userMessage');
     if (userMessageInput) {
         userMessageInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
+            if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 searchFlights();
             }
         });
+        
+        userMessageInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+        });
     }
     
-    console.log('✅ Flight Bot Interface initialisée');
+    console.log('Flight Bot Interface initialisée');
 });
