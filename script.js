@@ -1,1163 +1,486 @@
-// ===== VERSION INFO =====
-// Version: 2.1.0
-// Last Updated: 2024-12-19 14:30:00
-// Features: Version tracking, Debug console, Enhanced booking flow
+// Flight Bot - Interface Web JavaScript - Version Duffel Corrigée
+console.log('🚀 Flight Bot Interface démarrée - Version Duffel');
 
-const APP_VERSION = {
-    js: '2.1.0',
-    buildDate: '2024-12-19',
-    buildTime: '14:30:00',
-    features: ['Version tracking', 'Debug console', 'Passenger booking', 'API integration']
+// Configuration des APIs
+const API_BASE_URL = 'https://adequately-coherent-jaybird.ngrok-free.app/webhook-test';
+const API_ENDPOINTS = {
+    search: `${API_BASE_URL}/flight-search`,
+    select: `${API_BASE_URL}/flight-select`,
+    passengerData: `${API_BASE_URL}/passenger-data`,
+    bookingConfirm: `${API_BASE_URL}/booking-confirm`
 };
 
-// === Configuration Webhooks - URLs DE PRODUCTION n8n ===
-
-// Sous-domaine configurable (changer ici seulement 👇)
-const N8N_SUBDOMAIN = "amibio.app.n8n.cloud";
-
-// Générateur d'URL webhook
-const WEBHOOK = (path) => `https://${N8N_SUBDOMAIN}/webhook/${path}`;
-
-// Endpoints
-const N8N_WEBHOOK_URL = WEBHOOK("flight-search");
-
-const BOOKING_WEBHOOKS = {
-    flightSelect: WEBHOOK("flight-select"),
-    passengerData: WEBHOOK("passenger-data"),
-    bookingConfirm: WEBHOOK("booking-confirm")
-};
-
-// === État global de la réservation ===
+// État global de la réservation
 let bookingState = {
     selectedFlight: null,
-    selectedFlightData: null,
     passengers: [],
     contact: {},
-    currentStep: 'search',
+    currentStep: 'search', // search, select, passengers, confirm, completed
     sessionId: 'web-' + Date.now(),
     pricing: null
 };
 
-// === Éléments DOM ===
-const chatContainer = document.getElementById('chatContainer');
-const messageInput = document.getElementById('messageInput');
-const sendButton = document.getElementById('sendButton');
-const typingIndicator = document.getElementById('typingIndicator');
+// ====================
+// FONCTIONS HELPERS ROBUSTES
+// ====================
 
-// === Initialisation avec versioning ===
-document.addEventListener('DOMContentLoaded', function() {
-    initializeApp();
-    setupEventListeners();
-    messageInput.focus();
-    
-    debugLog(`🚀 Application v${APP_VERSION.js} initialized`, 'success');
-    debugLog(`📡 API Endpoint: ${N8N_SUBDOMAIN}`, 'info');
-    debugLog(`🆔 Session ID: ${bookingState.sessionId}`, 'info');
-});
-
-function initializeApp() {
-    // Mettre à jour les informations de version
-    updateVersionInfo();
-    
-    // Test de connectivité initial - DÉSACTIVÉ pour éviter les appels automatiques
-    // setTimeout(() => {
-    //     testAPIConnection();
-    // }, 1000);
-    
-    // Afficher un statut neutre au lieu de tester automatiquement
-    const statusElement = document.getElementById('apiStatus');
-    if (statusElement) {
-        statusElement.textContent = '⚪ Prêt pour test';
-    }
-    
-    // Afficher la version dans la console
-    console.log(`%c✈️ AI Flight Search Bot v${APP_VERSION.js}`, 'color: #2196F3; font-size: 16px; font-weight: bold;');
-    console.log(`%cBuild: ${APP_VERSION.buildDate} ${APP_VERSION.buildTime}`, 'color: #6b7280;');
-    console.log(`%cFeatures: ${APP_VERSION.features.join(', ')}`, 'color: #10b981;');
-}
-
-function updateVersionInfo() {
-    // Mettre à jour la version JS
-    const jsVersionElement = document.getElementById('jsVersion');
-    if (jsVersionElement) {
-        jsVersionElement.textContent = `v${APP_VERSION.js}`;
-    }
-    
-    // Mettre à jour les infos de session
-    const sessionElement = document.getElementById('sessionInfo');
-    if (sessionElement) {
-        sessionElement.textContent = bookingState.sessionId;
-    }
-}
-
-// === Test de connectivité API ===
-async function testAPIConnection() {
-    const statusElement = document.getElementById('apiStatus');
-    if (!statusElement) return;
-    
-    statusElement.textContent = '🔄 Test en cours...';
-    debugLog('🔍 Testing API connection...', 'info');
-    
-    try {
-        const testPayload = {
-            message: 'API connection test',
-            sessionId: 'test-' + Date.now(),
-            timestamp: new Date().toISOString(),
-            source: 'web-test'
+// Fonction helper pour gérer les noms de passagers de façon robuste
+function safeGetPassengerData(passenger, index = 0) {
+    if (!passenger || typeof passenger !== 'object') {
+        console.warn(`⚠️ Passager ${index + 1} invalide:`, passenger);
+        return {
+            firstName: 'Passager',
+            lastName: `${index + 1}`,
+            fullName: `Passager ${index + 1}`,
+            dateOfBirth: '',
+            gender: 'MALE'
         };
-        
-        const response = await fetch(N8N_WEBHOOK_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(testPayload),
-            signal: AbortSignal.timeout(5000) // 5 secondes timeout
-        });
-        
-        if (response.ok) {
-            statusElement.textContent = '✅ API Connectée';
-            debugLog('✅ API connection successful', 'success');
-        } else {
-            throw new Error(`HTTP ${response.status}`);
-        }
-        
-    } catch (error) {
-        statusElement.textContent = '❌ API Déconnectée';
-        debugLog(`❌ API connection failed: ${error.message}`, 'error');
     }
+
+    // Toutes les variantes possibles de prénom
+    const firstName = passenger.firstName || 
+                     passenger.given_name || 
+                     passenger.name?.firstName || 
+                     passenger.name?.given_name ||
+                     passenger.first_name ||
+                     'Prénom';
+
+    // Toutes les variantes possibles de nom
+    const lastName = passenger.lastName || 
+                    passenger.family_name || 
+                    passenger.name?.lastName || 
+                    passenger.name?.family_name ||
+                    passenger.last_name ||
+                    'Nom';
+
+    // Autres données
+    const dateOfBirth = passenger.dateOfBirth || 
+                       passenger.born_on || 
+                       passenger.date_of_birth ||
+                       '';
+
+    const gender = passenger.gender || 
+                   passenger.sex ||
+                   'MALE';
+
+    return {
+        firstName: firstName.toString().trim(),
+        lastName: lastName.toString().trim(),
+        fullName: `${firstName.toString().trim()} ${lastName.toString().trim()}`,
+        dateOfBirth: dateOfBirth.toString().trim(),
+        gender: gender.toString().toUpperCase()
+    };
 }
 
-function setupEventListeners() {
-    // Auto-resize textarea
-    messageInput.addEventListener('input', function() {
-        this.style.height = 'auto';
-        this.style.height = Math.min(this.scrollHeight, 120) + 'px';
-    });
+// Fonction helper pour gérer les prix de façon robuste
+function safeGetPricing(flightData) {
+    console.log('📊 Debug pricing data:');
+    
+    // Plusieurs sources possibles pour le prix
+    const priceSources = [
+        flightData?.price,
+        flightData?.pricing,
+        flightData?.selectedFlight?.price,
+        flightData?.duffelOffer?.price,
+        flightData?.data?.price
+    ];
 
-    // Envoyer avec Entrée
-    messageInput.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            sendMessage();
+    let finalPrice = null;
+    let finalCurrency = 'EUR';
+
+    for (const priceSource of priceSources) {
+        if (priceSource && (priceSource.total || priceSource.grandTotal)) {
+            finalPrice = priceSource.total || priceSource.grandTotal;
+            finalCurrency = priceSource.currency || 'EUR';
+            console.log('💰 Prix depuis', priceSource.constructor?.name || 'source', ':', finalPrice, finalCurrency);
+            break;
         }
-    });
-
-    // Raccourcis clavier
-    document.addEventListener('keydown', function(e) {
-        // Ctrl/Cmd + ` pour toggle debug console
-        if (e.key === '`' && (e.ctrlKey || e.metaKey)) {
-            e.preventDefault();
-            toggleDebugConsole();
-        }
-        
-        // Ctrl/Cmd + I pour toggle version info
-        if (e.key === 'i' && (e.ctrlKey || e.metaKey)) {
-            e.preventDefault();
-            toggleVersionInfo();
-        }
-    });
-}
-
-// === Gestion des exemples ===
-function fillExample(text) {
-    messageInput.value = text;
-    messageInput.focus();
-    messageInput.style.height = 'auto';
-    messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
-    
-    debugLog(`📝 Example filled: "${text.substring(0, 30)}..."`, 'info');
-}
-
-// === Affichage messages dans le chat ===
-function addMessage(content, isUser = false, isFlightResult = false) {
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${isUser ? 'user' : 'bot'}`;
-    
-    const avatar = document.createElement('div');
-    avatar.className = `avatar ${isUser ? 'user' : 'bot'}`;
-    avatar.textContent = isUser ? '👤' : '🤖';
-    
-    const bubble = document.createElement('div');
-    bubble.className = 'message-bubble';
-    
-    if (isFlightResult) {
-        bubble.innerHTML = content;
-        bubble.classList.add('success-animation');
-    } else {
-        bubble.innerHTML = content.replace(/\n/g, '<br>');
     }
-    
-    messageDiv.appendChild(avatar);
-    messageDiv.appendChild(bubble);
-    
-    chatContainer.appendChild(messageDiv);
-    chatContainer.scrollTop = chatContainer.scrollHeight;
-    
-    // Log du message
-    const messageType = isUser ? 'user' : 'bot';
-    const messagePreview = content.replace(/<[^>]*>/g, '').substring(0, 50);
-    debugLog(`💬 ${messageType}: ${messagePreview}...`, 'info');
-}
 
-// Afficher/masquer l'indicateur de frappe
-function showTyping(show = true) {
-    typingIndicator.style.display = show ? 'flex' : 'none';
-    if (show) {
-        chatContainer.scrollTop = chatContainer.scrollHeight;
-        debugLog('⌨️ Typing indicator shown', 'info');
-    } else {
-        debugLog('⌨️ Typing indicator hidden', 'info');
+    if (!finalPrice) {
+        console.warn('⚠️ Aucun prix trouvé, utilisation prix par défaut');
+        finalPrice = '0.00';
     }
+
+    return {
+        amount: parseFloat(finalPrice),
+        currency: finalCurrency,
+        formatted: `${parseFloat(finalPrice).toFixed(2)} ${finalCurrency}`
+    };
 }
 
-// === Recherche de vol ===
-async function sendMessage() {
-    const message = messageInput.value.trim();
-    if (!message) return;
+// ====================
+// RECHERCHE DE VOLS
+// ====================
 
-    debugLog(`🔍 Sending search query: "${message}"`, 'info');
+async function searchFlights() {
+    const userMessage = document.getElementById('userMessage').value.trim();
     
-    addMessage(message, true);
-    messageInput.value = '';
-    messageInput.style.height = 'auto';
-    showTyping(true);
-
-    try {
-        const startTime = performance.now();
-        const result = await callFlightAPI(message);
-        const endTime = performance.now();
-        const responseTime = Math.round(endTime - startTime);
-        
-        showTyping(false);
-        debugLog(`⚡ API response time: ${responseTime}ms`, 'info');
-
-        if (result) {
-            const html = formatFlightResult(result);
-            addMessage(html, false, true);
-            
-            if (result.success && result.bestFlights) {
-                debugLog(`✈️ Found ${result.bestFlights.length} flights`, 'success');
-            }
-        }
-    } catch (error) {
-        showTyping(false);
-        debugLog(`❌ Search error: ${error.message}`, 'error');
-        addMessage(`❌ Erreur: ${error.message}`, false);
-    }
-}
-
-// === Affichage des résultats ===
-function displayFlightResults(response) {
-    if (!response.success || !response.bestFlights || response.bestFlights.length === 0) {
-        debugLog('⚠️ No flights found in response', 'warning');
-        addMessage("❌ Aucun vol trouvé ou erreur de recherche.", false);
+    if (!userMessage) {
+        addMessage('Veuillez entrer votre recherche de vol.', false);
         return;
     }
 
-    debugLog(`✈️ Displaying ${response.bestFlights.length} flight results`, 'success');
+    console.log('🔍 Recherche:', userMessage);
+    addMessage(userMessage, true);
+    addMessage('Recherche en cours...', false);
 
-    let flightsHtml = `
-        <div style="background: linear-gradient(135deg, #f8fafc, #e2e8f0); border-radius: 16px; padding: 20px; margin-top: 15px;">
-            <h3 style="color: #1e293b; margin-bottom: 15px;">✈️ Vols disponibles</h3>
-    `;
+    try {
+        const response = await fetch(API_ENDPOINTS.search, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                message: userMessage,
+                sessionId: bookingState.sessionId
+            })
+        });
 
-    response.bestFlights.forEach((flight, index) => {
-        // Bloc retour si dispo
-        let retourHtml = '';
-        if (flight.inbound) {
-            retourHtml = `
-                <div style="font-size: 13px; color: #64748b; margin-top: 6px;">
-                    🕐 RETOUR: ${flight.inbound.departure || 'N/A'} → ${flight.inbound.arrival || 'N/A'} | ⏱️ ${flight.inbound.duration || 'N/A'}
-                </div>
-            `;
+        const data = await response.json();
+        console.log('📡 Réponse recherche:', data);
+
+        if (data.success && data.bestFlights && data.bestFlights.length > 0) {
+            displayFlightResults(data);
+        } else {
+            const errorMsg = data.message || 'Aucun vol trouvé pour votre recherche.';
+            addMessage(`❌ ${errorMsg}`, false);
+            
+            if (data.suggestions && data.suggestions.length > 0) {
+                addMessage('💡 Suggestions:\n' + data.suggestions.join('\n'), false);
+            }
         }
 
-        flightsHtml += `
-            <div style="background: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin-bottom: 12px; cursor: pointer; transition: all 0.3s ease;" 
-                 onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(0,0,0,0.1)'"
-                 onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 10px rgba(0,0,0,0.05)'"
-                 onclick="selectFlight(${index}, ${JSON.stringify(flight.originalAmadeusData || flight).replace(/"/g, '&quot;')})">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                    <div style="flex: 1;">
-                        <div style="font-weight: 600; color: #1e293b; margin-bottom: 8px;">
-                            ${flight.airline?.name || 'Compagnie'} (${flight.airline?.code || ''})
-                        </div>
-                        <div style="font-size: 13px; color: #64748b; margin-bottom: 8px;">
-                            🕐 ALLER: ${flight.outbound?.departure || flight.schedule?.departure || 'N/A'} → ${flight.outbound?.arrival || flight.schedule?.arrival || 'N/A'} | ⏱️ ${flight.outbound?.duration || flight.schedule?.duration || 'N/A'}
-                            ${retourHtml}
-                        </div>
-                        <div style="font-size: 12px; color: #6b7280;">
-                            ${flight.route?.stopsText || (flight.route?.stops === 0 ? 'Direct' : flight.route?.stops + ' escale(s)' || '')}
-                        </div>
+        // Réinitialiser le champ
+        document.getElementById('userMessage').value = '';
+
+    } catch (error) {
+        console.error('💥 Erreur recherche:', error);
+        addMessage('❌ Erreur lors de la recherche. Veuillez réessayer.', false);
+    }
+}
+
+function displayFlightResults(data) {
+    const flights = data.bestFlights || [];
+    const searchParams = data.searchParams || {};
+    
+    let resultsHtml = `
+        <div style="background: linear-gradient(135deg, #1e40af, #3b82f6); color: white; border-radius: 16px; padding: 20px; margin: 15px 0;">
+            <div style="text-align: center; margin-bottom: 15px;">
+                <div style="font-size: 20px; font-weight: bold;">✈️ Vols Disponibles</div>
+                <div style="font-size: 14px; opacity: 0.9;">
+                    ${searchParams.originCity} → ${searchParams.destinationCity}
+                    ${searchParams.departureDate ? ` | ${new Date(searchParams.departureDate).toLocaleDateString('fr-FR')}` : ''}
+                </div>
+            </div>
+    `;
+
+    flights.forEach((flight, index) => {
+        const pricing = safeGetPricing(flight);
+        const scheduleOut = flight.schedule || {};
+        const scheduleIn = flight.inbound || null;
+        
+        resultsHtml += `
+            <div style="background: white; color: #1f2937; border-radius: 12px; padding: 15px; margin: 10px 0;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <div style="font-weight: bold; font-size: 16px;">
+                        ${flight.airline?.name || 'Compagnie inconnue'}
+                        <span style="background: #${getScoreColor(flight.score)}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px; margin-left: 8px;">
+                            ${flight.score || 70}/100
+                        </span>
                     </div>
-                    <div style="text-align: right;">
-                        <div style="font-weight: bold; color: #1e293b; margin-bottom: 8px; font-size: 18px;">
-                            ${flight.price?.amount || 'N/A'} ${flight.price?.currency || 'EUR'}
-                        </div>
-                        <div style="font-size: 12px; color: #10b981; margin-bottom: 8px;">
-                            ${flight.category || 'Standard'} • Score: ${flight.score || 'N/A'}/100
-                        </div>
-                        <button style="background: #10b981; color: white; border: none; padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: bold; cursor: pointer; transition: all 0.3s ease;">
-                            🎫 Sélectionner
-                        </button>
+                    <div style="font-size: 18px; font-weight: bold; color: #059669;">
+                        ${pricing.formatted}
                     </div>
+                </div>
+                
+                <div style="font-size: 14px; color: #6b7280; margin-bottom: 12px;">
+                    <strong>🛫 ALLER:</strong> ${scheduleOut.departure} → ${scheduleOut.arrival} | ⏱️ ${scheduleOut.duration}
+                    ${scheduleIn ? `<br><strong>🛬 RETOUR:</strong> ${scheduleIn.departure} → ${scheduleIn.arrival} | ⏱️ ${scheduleIn.duration}` : ''}
+                </div>
+                
+                <div style="text-align: center; margin-top: 12px;">
+                    <button onclick="selectFlight(${index})" 
+                            style="background: linear-gradient(135deg, #059669, #047857); color: white; border: none; padding: 10px 20px; border-radius: 20px; font-weight: 600; cursor: pointer;">
+                        📋 Réserver ce vol
+                    </button>
                 </div>
             </div>
         `;
     });
 
-    flightsHtml += '</div>';
-    addMessage(flightsHtml, false, true);
-}
-
-// === Formatage des résultats pour affichage initial ===
-function formatFlightResult(result) {
-    if (!result.success) {
-        debugLog(`❌ Flight search failed: ${result.message}`, 'error');
-        return `<div class="error-message"><strong>❌ ${result.message || 'Erreur lors de l\'analyse'}</strong></div>`;
-    }
-
-    if (result.bestFlights && result.bestFlights.length > 0) {
-        setTimeout(() => displayFlightResults(result), 100);
-    }
-
-    return `
-        <div class="flight-result">
-            <div class="flight-header">
-                ✈️ Recherche de vol analysée par l'IA
-            </div>
-            <div class="flight-route">
-                ${result.searchParams?.originCity} → ${result.searchParams?.destinationCity}
-            </div>
-        </div>
-    `;
-}
-
-// === API call vers n8n ===
-async function callFlightAPI(message) {
-    try {
-        debugLog(`📡 Calling flight API...`, 'info');
-        
-        const payload = {
-            message,
-            sessionId: bookingState.sessionId,
-            timestamp: new Date().toISOString(),
-            source: 'web',
-            version: APP_VERSION.js
-        };
-        
-        const response = await fetch(N8N_WEBHOOK_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        const result = await response.json();
-        debugLog(`✅ API response received`, 'success');
-        return result;
-
-    } catch (error) {
-        debugLog(`❌ API call failed: ${error.message}`, 'error');
-        console.error('❌ Erreur API n8n:', error);
-        return { success: false, message: "Erreur API" };
-    }
-}
-
-// === Sélection d'un vol ===
-async function selectFlight(flightIndex, flightData) {
-    debugLog(`🎫 Selecting flight ${flightIndex}`, 'info');
+    resultsHtml += '</div>';
     
-    addMessage('🎫 Vol sélectionné ! Vérification du prix en temps réel...', false);
-    showTyping(true);
+    // Stocker les données pour la sélection
+    bookingState.searchResults = flights;
+    bookingState.searchParams = searchParams;
+    
+    addMessage(resultsHtml, false, true);
+}
+
+// ====================
+// SÉLECTION DE VOL
+// ====================
+
+async function selectFlight(flightIndex) {
+    console.log('✈️ Sélection du vol', flightIndex + 1);
+    
+    if (!bookingState.searchResults || !bookingState.searchResults[flightIndex]) {
+        addMessage('❌ Erreur: vol non trouvé', false);
+        return;
+    }
+
+    const selectedFlight = bookingState.searchResults[flightIndex];
+    addMessage('Vérification du prix en temps réel...', false);
 
     try {
-        const payload = {
-            flightId: `flight_${flightIndex}_${Date.now()}`,
-            flightIndex,
-            selectedFlight: flightData,
-            passengers: 1,
-            travelClass: 'ECONOMY',
-            sessionId: bookingState.sessionId,
-            timestamp: new Date().toISOString(),
-            version: APP_VERSION.js
-        };
-        
-        debugLog(`📡 Sending flight selection...`, 'info');
-        
-        const response = await fetch(BOOKING_WEBHOOKS.flightSelect, {
+        const response = await fetch(API_ENDPOINTS.select, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                flightIndex: flightIndex,
+                flightId: selectedFlight.duffelData?.offerId || `flight_${flightIndex}`,
+                selectedFlight: selectedFlight,
+                sessionId: bookingState.sessionId,
+                passengers: 1,
+                travelClass: bookingState.searchParams?.travelClass || 'ECONOMY'
+            })
         });
 
-        showTyping(false);
+        const data = await response.json();
+        console.log('📡 Réponse sélection:', data);
 
-        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        const result = await response.json();
-
-        if (result && result.success) {
-            // Sauvegarder les données de vol et pricing
-            bookingState.selectedFlight = flightData;
-            bookingState.selectedFlightData = result.flightSelection;
-            bookingState.pricing = result.pricing;
+        if (data.success) {
+            bookingState.selectedFlight = selectedFlight;
+            bookingState.pricing = data.pricing;
             bookingState.currentStep = 'passengers';
             
-            debugLog(`✅ Flight selected successfully, price: ${result.pricing?.totalPrice}`, 'success');
-            addMessage('✅ Vol confirmé ! Veuillez maintenant saisir les informations des passagers.', false);
-            
-            // Afficher le formulaire passager
-            setTimeout(() => showPassengerForm(), 500);
+            showPassengerForm();
         } else {
-            debugLog(`❌ Flight selection failed: ${result?.error}`, 'error');
-            addMessage(`❌ ${result?.error || 'Erreur lors de la sélection du vol'}`, false);
+            const errorMsg = data.message || 'Erreur lors de la sélection du vol.';
+            addMessage(`❌ ${errorMsg}`, false);
         }
+
     } catch (error) {
-        showTyping(false);
-        debugLog(`❌ Flight selection error: ${error.message}`, 'error');
-        console.error('❌ Erreur sélection vol:', error);
-        addMessage(`❌ Erreur de connexion: ${error.message}`, false);
+        console.error('💥 Erreur sélection:', error);
+        addMessage('❌ Erreur lors de la sélection. Veuillez réessayer.', false);
     }
 }
 
-// === Affichage du formulaire passager ===
+// ====================
+// FORMULAIRE PASSAGERS
+// ====================
+
 function showPassengerForm() {
-    debugLog('👤 Showing passenger form', 'info');
+    console.log('👤 Affichage formulaire passager');
     
-    // Récupérer les données depuis les bonnes sources
-    const flightInfo = bookingState.selectedFlight || {}; // Données Amadeus originales
-    const pricing = bookingState.pricing || {};
-    const selectionData = bookingState.selectedFlightData || {};
-    
-    // Debug des données disponibles
-    debugLog('📊 Flight info available:', 'info');
-    console.log('selectedFlight:', bookingState.selectedFlight);
-    console.log('pricing:', bookingState.pricing);
-    console.log('selectedFlightData:', bookingState.selectedFlightData);
-    
-    // Extraire les informations de compagnie
-    let airlineName = 'Compagnie non identifiée';
-    let airlineCode = '';
-    
-    // Essayer différentes sources pour la compagnie
-    if (flightInfo.validatingAirlineCodes && flightInfo.validatingAirlineCodes[0]) {
-        airlineCode = flightInfo.validatingAirlineCodes[0];
-        airlineName = getAirlineName(airlineCode);
-    } else if (selectionData.selectedFlight?.airline?.name) {
-        airlineName = selectionData.selectedFlight.airline.name;
-        airlineCode = selectionData.selectedFlight.airline.code || '';
-    }
-    
-    // Extraire le prix
-    let priceDisplay = 'N/A EUR';
-    if (pricing.totalPrice && pricing.currency) {
-        priceDisplay = `${pricing.totalPrice} ${pricing.currency}`;
-    } else if (pricing.basePrice && pricing.currency) {
-        priceDisplay = `${pricing.basePrice} ${pricing.currency}`;
-    } else if (flightInfo.price?.total && flightInfo.price?.currency) {
-        priceDisplay = `${flightInfo.price.total} ${flightInfo.price.currency}`;
-    }
-    
-    // Nombre de passagers
-    const passengerCount = selectionData.passengers || 1;
-    
-    // NOUVEAU: Extraire les détails de vol (horaires, dates, escales)
-    let flightDetails = '';
-    
-    try {
-        const itineraries = flightInfo.itineraries || [];
-        
-        itineraries.forEach((itinerary, index) => {
-            const segments = itinerary.segments || [];
-            if (segments.length === 0) return;
-            
-            const firstSegment = segments[0];
-            const lastSegment = segments[segments.length - 1];
-            const stops = segments.length - 1;
-            
-            // Type de vol (aller/retour)
-            const flightType = index === 0 ? 'ALLER' : 'RETOUR';
-            
-            // Dates et horaires
-            let departureInfo = 'N/A';
-            let arrivalInfo = 'N/A';
-            
-            if (firstSegment?.departure?.at) {
-                const depDate = new Date(firstSegment.departure.at);
-                const depDateStr = depDate.toLocaleDateString('fr-FR');
-                const depTimeStr = depDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-                departureInfo = `${depDateStr} à ${depTimeStr}`;
-            }
-            
-            if (lastSegment?.arrival?.at) {
-                const arrDate = new Date(lastSegment.arrival.at);
-                const arrDateStr = arrDate.toLocaleDateString('fr-FR');
-                const arrTimeStr = arrDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-                arrivalInfo = `${arrDateStr} à ${arrTimeStr}`;
-            }
-            
-            // Aéroports
-            const originAirport = firstSegment?.departure?.iataCode || 'N/A';
-            const destinationAirport = lastSegment?.arrival?.iataCode || 'N/A';
-            
-            // Durée
-            let duration = 'N/A';
-            if (itinerary.duration && itinerary.duration.startsWith('PT')) {
-                duration = itinerary.duration.replace('PT', '').replace('H', 'h').replace('M', 'm');
-            }
-            
-            // Escales
-            let stopsText = stops === 0 ? 'Direct' : `${stops} escale(s)`;
-            
-            flightDetails += `
-                <div class="summary-item">
-                    <span>${flightType}:</span>
-                    <strong>${originAirport} → ${destinationAirport}</strong>
-                </div>
-                <div class="summary-item">
-                    <span>Départ:</span>
-                    <strong>${departureInfo}</strong>
-                </div>
-                <div class="summary-item">
-                    <span>Arrivée:</span>
-                    <strong>${arrivalInfo}</strong>
-                </div>
-                <div class="summary-item">
-                    <span>Durée:</span>
-                    <strong>${duration} • ${stopsText}</strong>
-                </div>
-            `;
-            
-            if (index < itineraries.length - 1) {
-                flightDetails += '<div style="margin: 10px 0; border-bottom: 1px solid #e5e7eb;"></div>';
-            }
-        });
-        
-    } catch (error) {
-        debugLog(`⚠️ Error extracting flight details: ${error.message}`, 'warning');
-        flightDetails = `
-            <div class="summary-item">
-                <span>Détails vol:</span>
-                <strong>Informations non disponibles</strong>
-            </div>
-        `;
-    }
-    
-    debugLog(`📋 Summary data: ${airlineName} (${airlineCode}) - ${priceDisplay} - ${passengerCount} pax`, 'info');
+    const pricing = safeGetPricing(bookingState.pricing || bookingState.selectedFlight);
     
     const formHtml = `
-        <div class="passenger-form">
-            <div class="booking-summary">
-                <h4>📋 Résumé de votre réservation</h4>
-                <div class="summary-item">
-                    <span>Compagnie:</span>
-                    <strong>${airlineName}${airlineCode ? ` (${airlineCode})` : ''}</strong>
-                </div>
-                ${flightDetails}
-                <div style="margin: 10px 0; border-bottom: 1px solid #e5e7eb;"></div>
-                <div class="summary-item">
-                    <span>Prix total:</span>
-                    <strong>${priceDisplay}</strong>
-                </div>
-                <div class="summary-item">
-                    <span>Passagers:</span>
-                    <strong>${passengerCount} adulte(s)</strong>
+        <div style="background: linear-gradient(135deg, #7c3aed, #8b5cf6); color: white; border-radius: 16px; padding: 20px; margin: 15px 0;">
+            <div style="text-align: center; margin-bottom: 20px;">
+                <div style="font-size: 20px; font-weight: bold;">👤 Informations Passager</div>
+                <div style="font-size: 14px; opacity: 0.9;">
+                    Prix confirmé: ${pricing.formatted}
                 </div>
             </div>
-
-            <form id="passengerForm">
-                <div class="form-section">
-                    <h4>👤 Informations du passager</h4>
-                    <div style="margin-bottom: 15px; padding: 10px; background: #f0f9ff; border-radius: 8px; border: 1px solid #0ea5e9;">
-    <div style="font-size: 12px; color: #0369a1; margin-bottom: 8px; font-weight: 500;">🧪 Mode Test - Remplir automatiquement:</div>
-    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-        <button type="button" onclick="fillDummyPassenger('john')" 
-                style="background: #3b82f6; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer;">
-            👨 John Doe (BE)
-        </button>
-        <button type="button" onclick="fillDummyPassenger('marie')" 
-                style="background: #ec4899; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer;">
-            👩 Marie Dupont (FR)
-        </button>
-        <button type="button" onclick="fillDummyPassenger('test')" 
-                style="background: #10b981; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer;">
-            🧪 Test User (US)
-        </button>
-        <button type="button" onclick="clearForm()" 
-                style="background: #6b7280; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer;">
-            🗑️ Vider
-        </button>
-    </div>
-</div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">Prénom <span class="required">*</span></label>
-                            <input type="text" class="form-input" name="firstName" required 
-                                   placeholder="Prénom tel qu'indiqué sur le passeport">
+            
+            <div style="background: white; color: #1f2937; border-radius: 12px; padding: 20px;">
+                <form id="passengerForm">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                        <div>
+                            <label style="display: block; font-weight: 600; margin-bottom: 5px;">Prénom *</label>
+                            <input type="text" id="firstName" required 
+                                   style="width: 100%; padding: 8px; border: 2px solid #e5e7eb; border-radius: 8px;">
                         </div>
-                        <div class="form-group">
-                            <label class="form-label">Nom <span class="required">*</span></label>
-                            <input type="text" class="form-input" name="lastName" required 
-                                   placeholder="Nom tel qu'indiqué sur le passeport">
+                        <div>
+                            <label style="display: block; font-weight: 600; margin-bottom: 5px;">Nom *</label>
+                            <input type="text" id="lastName" required 
+                                   style="width: 100%; padding: 8px; border: 2px solid #e5e7eb; border-radius: 8px;">
                         </div>
                     </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">Date de naissance <span class="required">*</span></label>
-                            <input type="date" class="form-input" name="dateOfBirth" required>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                        <div>
+                            <label style="display: block; font-weight: 600; margin-bottom: 5px;">Date de naissance *</label>
+                            <input type="date" id="dateOfBirth" required 
+                                   style="width: 100%; padding: 8px; border: 2px solid #e5e7eb; border-radius: 8px;">
                         </div>
-                        <div class="form-group">
-                            <label class="form-label">Genre <span class="required">*</span></label>
-                            <select class="form-select" name="gender" required>
+                        <div>
+                            <label style="display: block; font-weight: 600; margin-bottom: 5px;">Genre *</label>
+                            <select id="gender" required 
+                                    style="width: 100%; padding: 8px; border: 2px solid #e5e7eb; border-radius: 8px;">
                                 <option value="">Sélectionner</option>
-                                <option value="MALE">Masculin</option>
-                                <option value="FEMALE">Féminin</option>
+                                <option value="MALE">Homme</option>
+                                <option value="FEMALE">Femme</option>
                             </select>
                         </div>
                     </div>
-                </div>
-
-                <div class="form-section document-section">
-                    <h4>📄 Document de voyage</h4>
                     
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">Numéro de passeport <span class="required">*</span></label>
-                            <input type="text" class="form-input" name="passportNumber" required 
-                                   placeholder="Numéro de passeport">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Date d'expiration <span class="required">*</span></label>
-                            <input type="date" class="form-input" name="passportExpiry" required>
-                        </div>
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; font-weight: 600; margin-bottom: 5px;">Email *</label>
+                        <input type="email" id="email" required 
+                               style="width: 100%; padding: 8px; border: 2px solid #e5e7eb; border-radius: 8px;">
                     </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">Nationalité <span class="required">*</span></label>
-                            <select class="form-select" name="nationality" required>
-                                <option value="">Sélectionner</option>
-                                <option value="BE">Belgique</option>
-                                <option value="FR">France</option>
-                                <option value="DE">Allemagne</option>
-                                <option value="NL">Pays-Bas</option>
-                                <option value="GB">Royaume-Uni</option>
-                                <option value="ES">Espagne</option>
-                                <option value="IT">Italie</option>
-                                <option value="US">États-Unis</option>
-                                <option value="CA">Canada</option>
-                                <option value="AU">Australie</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="form-section contact-section">
-                    <h4>📧 Informations de contact</h4>
                     
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">Email <span class="required">*</span></label>
-                            <input type="email" class="form-input" name="email" required 
-                                   placeholder="votre.email@exemple.com">
-                            <div class="form-help-text">Votre confirmation de vol sera envoyée à cette adresse</div>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Téléphone <span class="required">*</span></label>
-                            <input type="tel" class="form-input" name="phone" required 
-                                   placeholder="+32 123 456 789">
-                        </div>
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; font-weight: 600; margin-bottom: 5px;">Téléphone *</label>
+                        <input type="tel" id="phone" required 
+                               style="width: 100%; padding: 8px; border: 2px solid #e5e7eb; border-radius: 8px;"
+                               placeholder="+32 123 456 789">
                     </div>
-                </div>
-
-                <div class="button-group">
-                    <button type="button" class="form-button secondary" onclick="cancelBooking()">
-                        Annuler
-                    </button>
-                    <button type="submit" class="form-button" id="submitPassengerBtn">
-                        Continuer la réservation
-                    </button>
-                </div>
-            </form>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; font-weight: 600; margin-bottom: 5px;">Numéro de passeport *</label>
+                        <input type="text" id="passportNumber" required 
+                               style="width: 100%; padding: 8px; border: 2px solid #e5e7eb; border-radius: 8px;">
+                    </div>
+                    
+                    <div style="text-align: center;">
+                        <button type="button" onclick="submitPassengerData()" 
+                                style="background: linear-gradient(135deg, #059669, #047857); color: white; border: none; padding: 12px 30px; border-radius: 20px; font-weight: 600; cursor: pointer;">
+                            📝 Valider les informations
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     `;
-
-
+    
     addMessage(formHtml, false, true);
-    
-    // Attacher les event listeners au formulaire
-    setTimeout(() => {
-        const form = document.getElementById('passengerForm');
-        if (form) {
-            form.addEventListener('submit', handlePassengerFormSubmit);
-            setupFormValidation();
-            debugLog('📝 Passenger form initialized', 'success');
-        }
-    }, 100);
 }
 
+async function submitPassengerData() {
+    console.log('📝 Submitting passenger form');
+    
+    // Récupération sécurisée des données du formulaire
+    const formData = {
+        firstName: document.getElementById('firstName')?.value?.trim() || '',
+        lastName: document.getElementById('lastName')?.value?.trim() || '',
+        dateOfBirth: document.getElementById('dateOfBirth')?.value || '',
+        gender: document.getElementById('gender')?.value || '',
+        email: document.getElementById('email')?.value?.trim() || '',
+        phone: document.getElementById('phone')?.value?.trim() || '',
+        passportNumber: document.getElementById('passportNumber')?.value?.trim() || ''
+    };
 
-// === Données dummy pour les tests ===
-const DUMMY_PASSENGERS = {
-    john: {
-        firstName: 'John',
-        lastName: 'Doe',
-        dateOfBirth: '1990-05-15',
-        gender: 'MALE',
-        passportNumber: 'AB123456',
-        passportExpiry: '2030-12-31',
-        nationality: 'BE',
-        email: 'john.doe@test.com',
-        phone: '+32 123 456 789'
-    },
-    marie: {
-        firstName: 'Marie',
-        lastName: 'Dupont',
-        dateOfBirth: '1985-08-22',
-        gender: 'FEMALE',
-        passportNumber: 'CD789012',
-        passportExpiry: '2029-06-15',
-        nationality: 'FR',
-        email: 'marie.dupont@test.com',
-        phone: '+33 987 654 321'
-    },
-    test: {
-        firstName: 'Test',
-        lastName: 'User',
-        dateOfBirth: '1995-01-01',
-        gender: 'MALE',
-        passportNumber: 'TEST123',
-        passportExpiry: '2028-12-31',
-        nationality: 'US',
-        email: 'test@example.com',
-        phone: '+1 555 123 4567'
-    }
-};
+    // Validation côté client
+    const errors = [];
+    if (!formData.firstName) errors.push('Prénom requis');
+    if (!formData.lastName) errors.push('Nom requis');
+    if (!formData.dateOfBirth) errors.push('Date de naissance requise');
+    if (!formData.gender) errors.push('Genre requis');
+    if (!formData.email || !formData.email.includes('@')) errors.push('Email valide requis');
+    if (!formData.phone) errors.push('Téléphone requis');
+    if (!formData.passportNumber) errors.push('Numéro de passeport requis');
 
-// Fonction pour remplir automatiquement le formulaire
-function fillDummyPassenger(passengerKey) {
-    const passenger = DUMMY_PASSENGERS[passengerKey];
-    if (!passenger) {
-        debugLog(`⚠️ Dummy passenger '${passengerKey}' not found`, 'warning');
+    if (errors.length > 0) {
+        addMessage('❌ Erreurs dans le formulaire:\n' + errors.join('\n'), false);
         return;
     }
-    
-    debugLog(`👤 Filling dummy data for: ${passenger.firstName} ${passenger.lastName}`, 'info');
-    
-    // Remplir tous les champs du formulaire
-    const form = document.getElementById('passengerForm');
-    if (!form) {
-        debugLog('❌ Passenger form not found', 'error');
-        return;
-    }
-    
-    // Remplir chaque champ
-    const fields = {
-        'firstName': passenger.firstName,
-        'lastName': passenger.lastName,
-        'dateOfBirth': passenger.dateOfBirth,
-        'gender': passenger.gender,
-        'passportNumber': passenger.passportNumber,
-        'passportExpiry': passenger.passportExpiry,
-        'nationality': passenger.nationality,
-        'email': passenger.email,
-        'phone': passenger.phone
-    };
-    
-    Object.entries(fields).forEach(([fieldName, value]) => {
-        const field = form.querySelector(`[name="${fieldName}"]`);
-        if (field) {
-            field.value = value;
-            // Déclencher l'événement pour la validation
-            field.dispatchEvent(new Event('input', { bubbles: true }));
-            field.dispatchEvent(new Event('blur', { bubbles: true }));
-        }
-    });
-    
-    debugLog('✅ Dummy passenger data filled successfully', 'success');
-}
 
-// Fonction pour vider le formulaire
-function clearForm() {
-    const form = document.getElementById('passengerForm');
-    if (form) {
-        form.reset();
-        // Nettoyer les erreurs de validation
-        form.querySelectorAll('.error').forEach(field => {
-            field.classList.remove('error');
-        });
-        form.querySelectorAll('.form-error').forEach(error => {
-            error.remove();
-        });
-        debugLog('🗑️ Form cleared', 'info');
-    }
-}
+    const passengerData = safeGetPassengerData(formData);
+    console.log('📋 Passenger data prepared:', passengerData.fullName);
 
-// Fonction helper pour obtenir le nom de la compagnie
-function getAirlineName(code) {
-    const airlines = {
-        'AF': 'Air France', 'LH': 'Lufthansa', 'BA': 'British Airways',
-        'KL': 'KLM', 'SN': 'Brussels Airlines', 'FR': 'Ryanair',
-        'U2': 'easyJet', 'EK': 'Emirates', 'QR': 'Qatar Airways',
-        'AZ': 'ITA Airways', 'IB': 'Iberia', 'LX': 'Swiss',
-        'OS': 'Austrian Airlines', 'SK': 'SAS', 'AY': 'Finnair',
-        'TP': 'TAP Portugal', 'EI': 'Aer Lingus', 'VY': 'Vueling',
-        'W6': 'Wizz Air', 'EW': 'Eurowings', 'HV': 'Transavia'
-    };
-    return airlines[code] || `${code} Airlines`;
-}
-
-// === Validation du formulaire ===
-function setupFormValidation() {
-    const form = document.getElementById('passengerForm');
-    if (!form) return;
-
-    const inputs = form.querySelectorAll('.form-input, .form-select');
-    
-    inputs.forEach(input => {
-        input.addEventListener('blur', validateField);
-        input.addEventListener('input', clearFieldError);
-    });
-}
-
-function validateField(event) {
-    const field = event.target;
-    const value = field.value.trim();
-    const name = field.name;
-    
-    clearFieldError(event);
-    
-    // Validation spécifique par champ
-    switch (name) {
-        case 'firstName':
-        case 'lastName':
-            if (value.length < 2) {
-                showFieldError(field, 'Minimum 2 caractères requis');
-                return false;
-            }
-            break;
-            
-        case 'dateOfBirth':
-            if (!value) {
-                showFieldError(field, 'Date de naissance requise');
-                return false;
-            }
-            const age = calculateAge(value);
-            if (age < 0 || age > 120) {
-                showFieldError(field, 'Date de naissance invalide');
-                return false;
-            }
-            break;
-            
-        case 'passportNumber':
-            if (value.length < 6) {
-                showFieldError(field, 'Numéro de passeport invalide');
-                return false;
-            }
-            break;
-            
-        case 'passportExpiry':
-            if (!value) {
-                showFieldError(field, 'Date d\'expiration requise');
-                return false;
-            }
-            const expiryDate = new Date(value);
-            const today = new Date();
-            if (expiryDate <= today) {
-                showFieldError(field, 'Passeport expiré');
-                return false;
-            }
-            break;
-            
-        case 'email':
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(value)) {
-                showFieldError(field, 'Email invalide');
-                return false;
-            }
-            break;
-            
-        case 'phone':
-            if (value.length < 10) {
-                showFieldError(field, 'Numéro de téléphone invalide');
-                return false;
-            }
-            break;
-    }
-    
-    return true;
-}
-
-function showFieldError(field, message) {
-    field.classList.add('error');
-    
-    let errorDiv = field.parentNode.querySelector('.form-error');
-    if (!errorDiv) {
-        errorDiv = document.createElement('div');
-        errorDiv.className = 'form-error';
-        field.parentNode.appendChild(errorDiv);
-    }
-    errorDiv.textContent = message;
-    
-    debugLog(`⚠️ Form validation error: ${field.name} - ${message}`, 'warning');
-}
-
-function clearFieldError(event) {
-    const field = event.target;
-    field.classList.remove('error');
-    
-    const errorDiv = field.parentNode.querySelector('.form-error');
-    if (errorDiv) {
-        errorDiv.remove();
-    }
-}
-
-function calculateAge(dateOfBirth) {
-    const today = new Date();
-    const birthDate = new Date(dateOfBirth);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-    
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-        age--;
-    }
-    
-    return age;
-}
-
-// === Soumission du formulaire passager ===
-async function handlePassengerFormSubmit(event) {
-    event.preventDefault();
-    
-    debugLog('📝 Submitting passenger form', 'info');
-    
-    const form = event.target;
-    const formData = new FormData(form);
-    const submitBtn = document.getElementById('submitPassengerBtn');
-    
-    // Validation complète
-    let isValid = true;
-    const inputs = form.querySelectorAll('.form-input, .form-select');
-    
-    inputs.forEach(input => {
-        if (!validateField({ target: input })) {
-            isValid = false;
-        }
-    });
-    
-    if (!isValid) {
-        addMessage('❌ Veuillez corriger les erreurs dans le formulaire.', false);
-        debugLog('❌ Form validation failed', 'error');
-        return;
-    }
-    
-    // Préparer les données
-    const passengerData = {
-        firstName: formData.get('firstName'),
-        lastName: formData.get('lastName'),
-        dateOfBirth: formData.get('dateOfBirth'),
-        gender: formData.get('gender'),
-        document: {
-            number: formData.get('passportNumber'),
-            expiryDate: formData.get('passportExpiry'),
-            nationality: formData.get('nationality')
-        }
-    };
-    
-    const contactData = {
-        email: formData.get('email'),
-        phone: formData.get('phone')
-    };
-    
-    debugLog(`📋 Passenger data prepared: ${passengerData.firstName} ${passengerData.lastName}`, 'info');
-    
-    // Désactiver le bouton et afficher loading
-    submitBtn.disabled = true;
-    submitBtn.innerHTML = '<div class="loading-spinner"></div>Traitement...';
-    
     try {
-        const payload = {
-            sessionId: bookingState.sessionId,
-            flightId: bookingState.selectedFlightData?.flightId,
-            passengers: [passengerData],
-            contact: contactData,
-            expectedPassengers: 1,
-            timestamp: new Date().toISOString(),
-            version: APP_VERSION.js
-        };
+        console.log('📡 Sending passenger data to API...');
         
-        debugLog('📡 Sending passenger data to API...', 'info');
-        
-        const response = await fetch(BOOKING_WEBHOOKS.passengerData, {
+        const response = await fetch(API_ENDPOINTS.passengerData, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                sessionId: bookingState.sessionId,
+                flightId: bookingState.selectedFlight?.duffelData?.offerId || 'unknown',
+                passengers: [formData], // Utiliser formData original
+                contact: {
+                    email: formData.email,
+                    phone: formData.phone
+                },
+                expectedPassengers: 1
+            })
         });
-        
-        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        const result = await response.json();
-        
-        if (result && result.success) {
-            bookingState.passengers = result.validatedPassengers;
-            bookingState.contact = result.contactInfo;
-            bookingState.currentStep = 'confirmation';
+
+        const data = await response.json();
+        console.log('📡 Réponse passager:', data);
+
+        if (data.success) {
+            console.log('✅ Passenger data validated successfully');
             
-            debugLog('✅ Passenger data validated successfully', 'success');
-            addMessage('✅ Informations passager validées ! Procédons à la confirmation finale.', false);
+            // Stockage sécurisé des données validées
+            bookingState.passengers = [passengerData]; // Utiliser les données formatées
+            bookingState.contact = {
+                email: formData.email,
+                phone: formData.phone
+            };
+            bookingState.currentStep = 'confirm';
             
-            // Afficher l'étape de confirmation
-            setTimeout(() => showBookingConfirmation(), 500);
+            showBookingConfirmation();
         } else {
-            throw new Error(result?.message || 'Validation des données échouée');
+            const errorMsg = data.message || 'Erreur de validation des données passager.';
+            addMessage(`❌ ${errorMsg}`, false);
+            
+            if (data.errors && data.errors.length > 0) {
+                addMessage('📋 Détails:\n' + data.errors.join('\n'), false);
+            }
         }
-        
+
     } catch (error) {
-        debugLog(`❌ Passenger validation error: ${error.message}`, 'error');
-        console.error('❌ Erreur validation passager:', error);
-        addMessage(`❌ Erreur: ${error.message}`, false);
-    } finally {
-        // Réactiver le bouton
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = 'Continuer la réservation';
+        console.error('💥 Erreur passager:', error);
+        addMessage('❌ Erreur lors de la validation. Veuillez réessayer.', false);
     }
 }
 
-// === Confirmation de réservation ===
-/*function showBookingConfirmation() {
-    debugLog('🎉 Showing booking confirmation', 'info');
-    
-    const passenger = bookingState.passengers[0];
-    const pricing = bookingState.pricing || {};
-    const flightInfo = bookingState.selectedFlightData?.selectedFlight;
-    
-    const confirmationHtml = `
-        <div class="passenger-form">
-            <div class="booking-summary">
-                <h4>🎉 Confirmation de réservation</h4>
-                <div class="summary-item">
-                    <span>Passager:</span>
-                    <strong>${passenger.name.firstName} ${passenger.name.lastName}</strong>
-                </div>
-                <div class="summary-item">
-                    <span>Email:</span>
-                    <strong>${bookingState.contact.email}</strong>
-                </div>
-                <div class="summary-item">
-                    <span>Prix total:</span>
-                      <strong>${finalPrice}</strong>
-                </div>
-            </div>
-            
-            <div style="text-align: center; margin: 20px 0;">
-                <p style="margin-bottom: 15px;">En cliquant sur "Confirmer la réservation", vous acceptez nos conditions générales.</p>
-                <p style="font-size: 14px; color: #6b7280;">Cette réservation est une simulation. Aucun paiement ne sera effectué.</p>
-            </div>
-            
-            <div class="button-group">
-                <button type="button" class="form-button secondary" onclick="cancelBooking()">
-                    Annuler
-                </button>
-                <button type="button" class="form-button" onclick="confirmBooking()">
-                    Confirmer la réservation
-                </button>
-            </div>
-        </div>
-    `;
-    
-    addMessage(confirmationHtml, false, true);
-}*/
+// ====================
+// CONFIRMATION DE RÉSERVATION
+// ====================
 
 function showBookingConfirmation() {
-    debugLog('🎉 Showing booking confirmation', 'info');
+    console.log('🎉 Showing booking confirmation');
     
-    const passenger = bookingState.passengers[0];
-    const pricing = bookingState.pricing || {};
-    const flightInfo = bookingState.selectedFlightData?.selectedFlight;
-    
-    // DEBUG: Afficher toutes les données disponibles
-    debugLog('📊 Debug pricing data:', 'info');
-    console.log('bookingState.pricing:', bookingState.pricing);
-    console.log('bookingState.selectedFlight:', bookingState.selectedFlight);
-    console.log('bookingState.selectedFlightData:', bookingState.selectedFlightData);
-    
-    // Logique de prix avec plus de sources
-    let finalPrice = 'Prix à confirmer';
-    
-    // Source 1: pricing.totalPrice
-    if (pricing.totalPrice && pricing.currency) {
-        finalPrice = `${pricing.totalPrice} ${pricing.currency}`;
-        debugLog(`💰 Prix depuis pricing.totalPrice: ${finalPrice}`, 'success');
-    }
-    // Source 2: pricing.basePrice
-    else if (pricing.basePrice && pricing.currency) {
-        finalPrice = `${pricing.basePrice} ${pricing.currency}`;
-        debugLog(`💰 Prix depuis pricing.basePrice: ${finalPrice}`, 'success');
-    }
-    // Source 3: selectedFlight original (données Amadeus)
-    else if (bookingState.selectedFlight?.price?.total) {
-        finalPrice = `${bookingState.selectedFlight.price.total} ${bookingState.selectedFlight.price.currency || 'EUR'}`;
-        debugLog(`💰 Prix depuis selectedFlight.price: ${finalPrice}`, 'success');
-    }
-    // Source 4: données de sélection
-    else if (bookingState.selectedFlightData?.pricing?.totalPrice) {
-        finalPrice = `${bookingState.selectedFlightData.pricing.totalPrice} ${bookingState.selectedFlightData.pricing.currency || 'EUR'}`;
-        debugLog(`💰 Prix depuis selectedFlightData.pricing: ${finalPrice}`, 'success');
-    }
-    // Source 5: fallback avec recherche dans toutes les propriétés
-    else {
-        debugLog('⚠️ Aucune source de prix trouvée, recherche approfondie...', 'warning');
-        
-        // Chercher dans tous les objets
-        const allPossiblePrices = [
-            pricing?.total,
-            pricing?.grandTotal,
-            flightInfo?.price?.total,
-            flightInfo?.price?.grandTotal,
-            bookingState.selectedFlight?.price?.grandTotal
-        ].filter(price => price && !isNaN(parseFloat(price)));
-        
-        if (allPossiblePrices.length > 0) {
-            const firstValidPrice = allPossiblePrices[0];
-            finalPrice = `${firstValidPrice} EUR`;
-            debugLog(`💰 Prix trouvé par recherche: ${finalPrice}`, 'success');
-        } else {
-            debugLog('❌ Aucun prix trouvé dans toutes les sources', 'error');
-        }
-    }
+    const pricing = safeGetPricing(bookingState.pricing || bookingState.selectedFlight);
+    const passenger = safeGetPassengerData(bookingState.passengers?.[0]);
     
     const confirmationHtml = `
-        <div class="passenger-form">
-            <div class="booking-summary">
-                <h4>🎉 Confirmation de réservation</h4>
-                <div class="summary-item">
-                    <span>Passager:</span>
-                    <strong>${passenger.name.firstName} ${passenger.name.lastName}</strong>
-                </div>
-                <div class="summary-item">
-                    <span>Email:</span>
-                    <strong>${bookingState.contact.email}</strong>
-                </div>
-                <div class="summary-item">
-                    <span>Prix total:</span>
-                    <strong>${finalPrice}</strong>
-                </div>
+        <div style="background: linear-gradient(135deg, #dc2626, #ef4444); color: white; border-radius: 16px; padding: 20px; margin: 15px 0;">
+            <div style="text-align: center; margin-bottom: 20px;">
+                <div style="font-size: 20px; font-weight: bold;">🎯 Confirmation de Réservation</div>
+                <div style="font-size: 14px; opacity: 0.9;">Vérifiez vos informations avant de confirmer</div>
             </div>
             
-            <div style="text-align: center; margin: 20px 0;">
-                <p style="margin-bottom: 15px;">En cliquant sur "Confirmer la réservation", vous acceptez nos conditions générales.</p>
-                <p style="font-size: 14px; color: #6b7280;">Cette réservation est une simulation. Aucun paiement ne sera effectué.</p>
-            </div>
-            
-            <div class="button-group">
-                <button type="button" class="form-button secondary" onclick="cancelBooking()">
-                    Annuler
-                </button>
-                <button type="button" class="form-button" onclick="confirmBooking()">
-                    Confirmer la réservation
-                </button>
+            <div style="background: white; color: #1f2937; border-radius: 12px; padding: 20px;">
+                <div style="margin-bottom: 15px;">
+                    <h4 style="margin: 0 0 8px 0; color: #1f2937;">✈️ Vol sélectionné</h4>
+                    <div style="font-size: 14px; color: #6b7280;">
+                        ${bookingState.selectedFlight?.airline?.name || 'Compagnie aérienne'}<br>
+                        Prix: ${pricing.formatted}
+                    </div>
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <h4 style="margin: 0 0 8px 0; color: #1f2937;">👤 Passager</h4>
+                    <div style="font-size: 14px; color: #6b7280;">
+                        ${passenger.fullName}<br>
+                        ${bookingState.contact?.email || 'Email non disponible'}
+                    </div>
+                </div>
+                
+                <div style="background: #fef3c7; padding: 12px; border-radius: 8px; margin: 15px 0;">
+                    <div style="font-size: 13px; color: #92400e;">
+                        <strong>⚠️ Simulation de réservation</strong><br>
+                        Ceci est une démonstration. Aucune réservation réelle ne sera effectuée.
+                    </div>
+                </div>
+                
+                <div style="text-align: center;">
+                    <button onclick="confirmBooking()" 
+                            style="background: linear-gradient(135deg, #dc2626, #b91c1c); color: white; border: none; padding: 12px 30px; border-radius: 20px; font-weight: 600; cursor: pointer;">
+                        🎯 Confirmer la réservation
+                    </button>
+                </div>
             </div>
         </div>
     `;
@@ -1165,83 +488,95 @@ function showBookingConfirmation() {
     addMessage(confirmationHtml, false, true);
 }
 
-// === Confirmation finale ===
 async function confirmBooking() {
-    debugLog('🎫 Starting final booking confirmation', 'info');
+    console.log('🎯 Confirming booking');
     
-    addMessage('🎫 Finalisation de votre réservation...', false);
-    showTyping(true);
-    
+    addMessage('Finalisation de votre réservation...', false);
+
     try {
-        const payload = {
-            sessionId: bookingState.sessionId,
-            flightId: bookingState.selectedFlightData?.flightId,
-            selectedFlight: bookingState.selectedFlight,
-            passengers: bookingState.passengers,
-            contact: bookingState.contact,
-            payment: {
-                method: 'simulation',
-                amount: bookingState.pricing?.totalPrice,
-                currency: bookingState.pricing?.currency
-            },
-            timestamp: new Date().toISOString(),
-            version: APP_VERSION.js
-        };
+        const passenger = safeGetPassengerData(bookingState.passengers?.[0]);
         
-        debugLog('📡 Sending booking confirmation...', 'info');
-        
-        const response = await fetch(BOOKING_WEBHOOKS.bookingConfirm, {
+        const response = await fetch(API_ENDPOINTS.bookingConfirm, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                sessionId: bookingState.sessionId,
+                flightId: bookingState.selectedFlight?.duffelData?.offerId || 'unknown',
+                selectedFlight: {
+                    ...bookingState.selectedFlight,
+                    price: bookingState.pricing || bookingState.selectedFlight?.price
+                },
+                passengers: [{
+                    firstName: passenger.firstName,
+                    lastName: passenger.lastName,
+                    name: {
+                        firstName: passenger.firstName,
+                        lastName: passenger.lastName
+                    },
+                    dateOfBirth: passenger.dateOfBirth,
+                    gender: passenger.gender
+                }],
+                contact: bookingState.contact,
+                payment: {
+                    method: 'simulation',
+                    status: 'confirmed'
+                }
+            })
         });
-        
-        showTyping(false);
-        
-        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        const result = await response.json();
-        
-        if (result && result.success) {
-            debugLog(`🎉 Booking confirmed! Reference: ${result.booking.reference}`, 'success');
-            
-            addMessage(`🎉 Réservation confirmée !\n\nNuméro de confirmation: ${result.confirmationNumber}\nRéférence: ${result.booking.reference}\n\n📧 Un email de confirmation a été envoyé à ${bookingState.contact.email}`, false);
-            
-            // Reset pour nouvelle recherche
-            setTimeout(() => {
-                debugLog('🔄 Resetting booking state for new search', 'info');
-                
-                bookingState = {
-                    selectedFlight: null,
-                    selectedFlightData: null,
-                    passengers: [],
-                    contact: {},
-                    currentStep: 'search',
-                    sessionId: 'web-' + Date.now(),
-                    pricing: null
-                };
-                
-                updateVersionInfo(); // Mettre à jour la nouvelle session
-                addMessage('✈️ Vous pouvez maintenant effectuer une nouvelle recherche !', false);
-            }, 3000);
+
+        const data = await response.json();
+        console.log('📡 Réponse confirmation:', data);
+
+        if (data.webResponse?.success) {
+            bookingState.currentStep = 'completed';
+            addMessage(data.webResponse.html, false, true);
         } else {
-            throw new Error(result?.message || 'Erreur lors de la confirmation');
+            const errorMsg = data.message || 'Erreur lors de la confirmation.';
+            addMessage(`❌ ${errorMsg}`, false);
         }
-        
+
     } catch (error) {
-        showTyping(false);
-        debugLog(`❌ Booking confirmation error: ${error.message}`, 'error');
-        console.error('❌ Erreur confirmation:', error);
-        addMessage(`❌ Erreur: ${error.message}`, false);
+        console.error('💥 Global error:', error);
+        addMessage('❌ Erreur lors de la confirmation. Veuillez réessayer.', false);
     }
 }
 
-// === Annulation ===
-function cancelBooking() {
-    debugLog('❌ Booking cancelled by user', 'warning');
+// ====================
+// FONCTIONS UTILITAIRES
+// ====================
+
+function addMessage(content, isUser = false, isHtml = false) {
+    const chatBox = document.getElementById('chatBox');
+    const messageDiv = document.createElement('div');
     
+    messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
+    
+    if (isHtml) {
+        messageDiv.innerHTML = content;
+    } else {
+        messageDiv.textContent = content;
+        if (!isUser) {
+            console.log('💬 bot:', content);
+        }
+    }
+    
+    chatBox.appendChild(messageDiv);
+    chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+function getScoreColor(score) {
+    if (score >= 90) return '22c55e'; // Vert
+    if (score >= 80) return '3b82f6'; // Bleu
+    if (score >= 70) return 'f59e0b'; // Orange
+    return 'ef4444'; // Rouge
+}
+
+function resetBooking() {
+    console.log('🔄 Reset booking state');
     bookingState = {
         selectedFlight: null,
-        selectedFlightData: null,
         passengers: [],
         contact: {},
         currentStep: 'search',
@@ -1249,134 +584,25 @@ function cancelBooking() {
         pricing: null
     };
     
-    updateVersionInfo(); // Mettre à jour la nouvelle session
-    addMessage('❌ Réservation annulée. Vous pouvez effectuer une nouvelle recherche.', false);
+    addMessage('Nouvelle recherche initialisée. Que puis-je vous aider à trouver ?', false);
 }
 
-// === Fonctions de gestion du versioning et debug ===
-
-function toggleVersionInfo() {
-    const panel = document.getElementById('versionPanel');
-    if (panel) {
-        panel.classList.toggle('visible');
-        
-        if (panel.classList.contains('visible')) {
-            debugLog('📊 Version panel opened', 'info');
-            // Mettre à jour les informations en temps réel
-            updateVersionInfo();
-        } else {
-            debugLog('📊 Version panel closed', 'info');
-        }
-    }
+function downloadTicket(confirmationNumber) {
+    console.log('📄 Download ticket:', confirmationNumber);
+    addMessage(`📄 Fonction de téléchargement à implémenter pour: ${confirmationNumber}`, false);
 }
 
-function toggleDebugConsole() {
-    const console = document.getElementById('debugConsole');
-    const content = document.getElementById('debugContent');
-    const toggle = document.querySelector('.debug-toggle');
-    
-    if (console && toggle) {
-        console.classList.toggle('expanded');
-        if (console.classList.contains('expanded')) {
-            toggle.textContent = '▲';
-            debugLog('🐛 Debug console expanded', 'info');
-        } else {
-            toggle.textContent = '▼';
-            debugLog('🐛 Debug console collapsed', 'info');
-        }
-    }
-}
-
-function reloadPage() {
-    debugLog('🔄 Page reload requested', 'info');
-    window.location.reload();
-}
-
-// === Fonctions utilitaires de debug ===
-
-// Fonction de log de debug déjà définie dans le HTML, mais on peut l'étendre ici
-window.originalDebugLog = window.debugLog;
-window.debugLog = function(message, type = 'info') {
-    // Appeler la fonction originale
-    if (window.originalDebugLog) {
-        window.originalDebugLog(message, type);
-    }
-    
-    // Également logger dans la console du navigateur
-    const timestamp = new Date().toLocaleTimeString();
-    const logMessage = `[${timestamp}] ${message}`;
-    
-    switch (type) {
-        case 'error':
-            console.error(logMessage);
-            break;
-        case 'warning':
-            console.warn(logMessage);
-            break;
-        case 'success':
-            console.log(`%c${logMessage}`, 'color: #10b981');
-            break;
-        default:
-            console.log(logMessage);
-    }
-};
-
-// === Performance monitoring ===
-
-// Mesurer les performances de l'application
-window.performance.mark('app-start');
-
-function trackPerformance(eventName, data = {}) {
-    const now = performance.now();
-    debugLog(`⚡ Performance: ${eventName} - ${now.toFixed(2)}ms`, 'info');
-    
-    // Vous pouvez également envoyer ces métriques à un service d'analytics
-    if (window.gtag) {
-        window.gtag('event', eventName, {
-            custom_parameter_1: data,
-            value: Math.round(now)
+// Gestion de l'événement Enter
+document.addEventListener('DOMContentLoaded', function() {
+    const userMessageInput = document.getElementById('userMessage');
+    if (userMessageInput) {
+        userMessageInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                searchFlights();
+            }
         });
     }
-}
-
-// === Gestion des erreurs globales ===
-
-window.addEventListener('error', function(event) {
-    debugLog(`💥 Global error: ${event.error?.message || event.message}`, 'error');
-    console.error('Global error:', event.error);
+    
+    console.log('✅ Flight Bot Interface initialisée');
 });
-
-window.addEventListener('unhandledrejection', function(event) {
-    debugLog(`💥 Unhandled promise rejection: ${event.reason}`, 'error');
-    console.error('Unhandled promise rejection:', event.reason);
-});
-
-// === Nettoyage et optimisations ===
-
-// Nettoyer les logs de debug après un certain temps
-setInterval(() => {
-    const debugLog = document.getElementById('debugLog');
-    if (debugLog && debugLog.children.length > 100) {
-        // Garder seulement les 50 derniers logs
-        while (debugLog.children.length > 50) {
-            debugLog.removeChild(debugLog.firstChild);
-        }
-        window.debugLog('🧹 Debug log cleaned (keeping last 50 entries)', 'info');
-    }
-}, 30000); // Toutes les 30 secondes
-
-// === Export pour tests et debugging ===
-
-// Exposer certaines fonctions pour les tests
-window.FlightBot = {
-    version: APP_VERSION,
-    bookingState,
-    testAPI: testAPIConnection,
-    resetState: cancelBooking,
-    debugLog: window.debugLog,
-    trackPerformance
-};
-
-// Log final d'initialisation
-window.debugLog(`🎯 FlightBot v${APP_VERSION.js} fully loaded and ready!`, 'success');
-trackPerformance('app-loaded');
