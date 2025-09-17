@@ -8,9 +8,9 @@
     <meta name="keywords" content="vol, avion, voyage, IA, intelligence artificielle, booking, réservation">
     
     <!-- Version Info -->
-    <meta name="version" content="2.1.0">
+    <meta name="version" content="2.1.1">
     <meta name="build-date" content="2024-12-19">
-    <meta name="build-time" content="14:30:00">
+    <meta name="build-time" content="17:45:00">
     
     <!-- Favicon -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✈️</text></svg>">
@@ -21,12 +21,12 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
     <!-- CSS avec versioning -->
-    <link rel="stylesheet" href="style.css?v=2.1.0">
+    <link rel="stylesheet" href="style.css?v=2.1.1">
 </head>
 <body>
     <!-- Version Badge -->
     <div id="versionBadge" class="version-badge" onclick="toggleVersionInfo()">
-        <span>v2.1.0</span>
+        <span>v2.1.1</span>
         <div class="version-indicator"></div>
     </div>
 
@@ -39,7 +39,7 @@
         <div class="version-content">
             <div class="version-item">
                 <span class="version-label">HTML:</span>
-                <span class="version-value" id="htmlVersion">v2.1.0</span>
+                <span class="version-value" id="htmlVersion">v2.1.1</span>
             </div>
             <div class="version-item">
                 <span class="version-label">CSS:</span>
@@ -51,7 +51,7 @@
             </div>
             <div class="version-item">
                 <span class="version-label">Build:</span>
-                <span class="version-value">2024-12-19 14:30:00</span>
+                <span class="version-value">2024-12-19 17:45:00</span>
             </div>
             <div class="version-item">
                 <span class="version-label">Session:</span>
@@ -119,13 +119,13 @@
             <div class="input-group">
                 <div class="input-wrapper">
                     <textarea 
-                        id="messageInput" 
+                        id="userMessage" 
                         class="message-input" 
                         placeholder="Exemple: Je veux aller à Bangkok depuis Bruxelles le 15 mars en business..."
                         rows="1"
                     ></textarea>
                 </div>
-                <button id="sendButton" class="send-button" onclick="sendMessage()">
+                <button id="sendButton" class="send-button" onclick="searchFlights()">
                     ➤
                 </button>
             </div>
@@ -144,14 +144,18 @@
     </div>
 
     <!-- JS avec versioning -->
-    <script src="script.js?v=2.1.0"></script>
+    <script src="script.js?v=2.1.1"></script>
     
-    <!-- Version checker -->
+    <!-- Version checker et fonctions utilitaires -->
     <script>
+        // Version JS sera définie par script.js
+        window.JS_VERSION = null;
+        
         // Vérifier les versions au chargement
         document.addEventListener('DOMContentLoaded', function() {
             checkVersions();
             initializeVersionInfo();
+            initializeChatInterface();
         });
         
         function checkVersions() {
@@ -168,20 +172,51 @@
         
         function detectCSSVersion() {
             // Rechercher dans les stylesheets
-            const styleSheets = Array.from(document.styleSheets);
             const cssLink = document.querySelector('link[href*="style.css"]');
             
             if (cssLink && cssLink.href.includes('v=')) {
                 const version = cssLink.href.match(/v=([^&]*)/)?.[1] || 'Unknown';
                 document.getElementById('cssVersion').textContent = `v${version}`;
             } else {
-                document.getElementById('cssVersion').textContent = 'v2.1.0 (inferred)';
+                document.getElementById('cssVersion').textContent = 'v2.1.1 (inferred)';
             }
         }
         
         function initializeVersionInfo() {
             // Cette fonction sera étendue par script.js
             console.log('🔧 Version system initialized');
+            
+            // Vérifier périodiquement la version JS
+            const checkJSVersion = () => {
+                if (window.JS_VERSION) {
+                    document.getElementById('jsVersion').textContent = `v${window.JS_VERSION}`;
+                } else {
+                    setTimeout(checkJSVersion, 100);
+                }
+            };
+            checkJSVersion();
+        }
+        
+        function initializeChatInterface() {
+            // Initialiser l'interface de chat
+            console.log('💬 Chat interface initialized');
+            
+            // Support de la touche Entrée
+            const messageInput = document.getElementById('userMessage');
+            if (messageInput) {
+                messageInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        searchFlights();
+                    }
+                });
+                
+                // Auto-resize du textarea
+                messageInput.addEventListener('input', function() {
+                    this.style.height = 'auto';
+                    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+                });
+            }
         }
         
         function toggleVersionInfo() {
@@ -222,8 +257,102 @@
             }
         };
         
+        // Fonction pour remplir les exemples
+        function fillExample(text) {
+            const messageInput = document.getElementById('userMessage');
+            if (messageInput) {
+                messageInput.value = text;
+                messageInput.focus();
+                // Trigger auto-resize
+                messageInput.style.height = 'auto';
+                messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
+            }
+        }
+        
+        // Fonction pour ajouter des messages au chat (fallback si script.js ne charge pas)
+        window.addMessage = window.addMessage || function(content, isUser = false, isHtml = false) {
+            const chatContainer = document.getElementById('chatContainer');
+            if (!chatContainer) return;
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user' : 'bot'}`;
+            
+            const avatarDiv = document.createElement('div');
+            avatarDiv.className = `avatar ${isUser ? 'user' : 'bot'}`;
+            avatarDiv.textContent = isUser ? '👤' : '🤖';
+            
+            const bubbleDiv = document.createElement('div');
+            bubbleDiv.className = 'message-bubble';
+            
+            if (isHtml) {
+                bubbleDiv.innerHTML = content;
+            } else {
+                bubbleDiv.textContent = content;
+                if (!isUser) {
+                    console.log('💬 bot:', content);
+                }
+            }
+            
+            messageDiv.appendChild(avatarDiv);
+            messageDiv.appendChild(bubbleDiv);
+            chatContainer.appendChild(messageDiv);
+            
+            // Scroll vers le bas
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        };
+        
+        // Fonction de test API
+        window.testAPIConnection = function() {
+            debugLog('🔍 Test de connexion API...', 'info');
+            document.getElementById('apiStatus').textContent = '🔄 Test en cours...';
+            
+            fetch('https://amibio.app.n8n.cloud/webhook/flight-search', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    message: 'test de connexion', 
+                    sessionId: 'test-' + Date.now() 
+                })
+            })
+            .then(response => {
+                if (response.ok) {
+                    document.getElementById('apiStatus').textContent = '✅ API accessible';
+                    debugLog('✅ API connection successful', 'success');
+                } else {
+                    document.getElementById('apiStatus').textContent = `❌ Erreur ${response.status}`;
+                    debugLog(`❌ API error: ${response.status}`, 'error');
+                }
+            })
+            .catch(error => {
+                document.getElementById('apiStatus').textContent = '❌ Non accessible';
+                debugLog(`❌ API connection failed: ${error.message}`, 'error');
+            });
+        };
+        
+        // Fonction searchFlights de fallback si script.js ne charge pas
+        window.searchFlights = window.searchFlights || function() {
+            const messageInput = document.getElementById('userMessage');
+            const message = messageInput?.value?.trim();
+            
+            if (!message) {
+                addMessage('Veuillez entrer votre recherche de vol.', false);
+                return;
+            }
+            
+            addMessage('❌ Script JavaScript principal non chargé. Vérifiez que script.js est accessible.', false);
+            debugLog('❌ searchFlights fallback called - script.js not loaded', 'error');
+        };
+        
         // Log initial
-        debugLog('🚀 Application initialized', 'success');
+        debugLog('🚀 HTML Application initialized', 'success');
+        
+        // Vérifier le chargement de script.js après 2 secondes
+        setTimeout(() => {
+            if (!window.JS_VERSION) {
+                debugLog('⚠️ script.js may not have loaded properly', 'warning');
+                document.getElementById('jsVersion').textContent = '❌ Non chargé';
+            }
+        }, 2000);
     </script>
 </body>
 </html>
