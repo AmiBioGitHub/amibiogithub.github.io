@@ -2,7 +2,7 @@
 console.log('🚀 Flight Bot Interface démarrée - Version Duffel');
 
 // Configuration des APIs
-const API_BASE_URL = 'https://adequately-coherent-jaybird.ngrok-free.app/webhook-test';
+const API_BASE_URL = 'https://amibio.app.n8n.cloud/webhook';
 const API_ENDPOINTS = {
     search: `${API_BASE_URL}/flight-search`,
     select: `${API_BASE_URL}/flight-select`,
