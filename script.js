@@ -298,7 +298,7 @@ function displayFlightResults(data) {
 }
 
 // ====================
-// SÉLECTION DE VOL
+// SÉLECTION DE VOL - VERSION CORRIGÉE
 // ====================
 
 async function selectFlight(flightIndex) {
@@ -310,22 +310,48 @@ async function selectFlight(flightIndex) {
     }
 
     const selectedFlight = bookingState.searchResults[flightIndex];
+    console.log('Vol sélectionné - données complètes:', selectedFlight);
+    
     addMessage('Vérification du prix en temps réel...', false);
 
     try {
+        // CORRECTION PRINCIPALE - Préparer les données Duffel
+        const duffelOffer = extractDuffelData(selectedFlight);
+        console.log('Données Duffel extraites:', duffelOffer);
+
+        // Données à envoyer vers n8n
+        const selectionPayload = {
+            flightIndex: flightIndex,
+            flightId: duffelOffer.id || selectedFlight.id || `flight_${flightIndex}`,
+            
+            // CORRECTION - Structure complète avec données Duffel
+            selectedFlight: {
+                ...selectedFlight,
+                // S'assurer que les données Duffel sont incluses
+                duffelData: duffelOffer
+            },
+            
+            sessionId: bookingState.sessionId,
+            passengers: 1,
+            travelClass: bookingState.searchParams?.travelClass || 'ECONOMY',
+            
+            // Métadonnées pour debugging
+            metadata: {
+                selectionTimestamp: new Date().toISOString(),
+                flightIndex: flightIndex,
+                totalFlights: bookingState.searchResults.length,
+                hasDuffelData: !!duffelOffer.id
+            }
+        };
+
+        console.log('🎯 Envoi sélection vers n8n:', selectionPayload);
+
         const response = await fetch(API_ENDPOINTS.select, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                flightIndex: flightIndex,
-                flightId: selectedFlight.duffelData?.offerId || `flight_${flightIndex}`,
-                selectedFlight: selectedFlight,
-                sessionId: bookingState.sessionId,
-                passengers: 1,
-                travelClass: bookingState.searchParams?.travelClass || 'ECONOMY'
-            })
+            body: JSON.stringify(selectionPayload)
         });
 
         const data = await response.json();
@@ -340,12 +366,62 @@ async function selectFlight(flightIndex) {
         } else {
             const errorMsg = data.message || 'Erreur lors de la sélection du vol.';
             addMessage(`❌ ${errorMsg}`, false);
+            
+            // Debug info si erreur
+            if (data.debugInfo) {
+                console.log('Debug info from n8n:', data.debugInfo);
+            }
         }
 
     } catch (error) {
         console.error('Erreur sélection:', error);
         addMessage('❌ Erreur lors de la sélection. Veuillez réessayer.', false);
     }
+}
+
+// NOUVELLE FONCTION HELPER - Extraire les données Duffel
+function extractDuffelData(selectedFlight) {
+    console.log('Extraction données Duffel depuis:', selectedFlight);
+    
+    // Option 1: Données déjà dans duffelData
+    if (selectedFlight.duffelData && selectedFlight.duffelData.id) {
+        console.log('✅ Données Duffel trouvées dans duffelData');
+        return selectedFlight.duffelData;
+    }
+    
+    // Option 2: Données dans originalData
+    if (selectedFlight.originalData && selectedFlight.originalData.id) {
+        console.log('✅ Données Duffel trouvées dans originalData');
+        return selectedFlight.originalData;
+    }
+    
+    // Option 3: L'ID commence par 'off_' (format Duffel)
+    if (selectedFlight.id && selectedFlight.id.startsWith('off_')) {
+        console.log('✅ ID Duffel détecté, reconstruction des données');
+        return {
+            id: selectedFlight.id,
+            total_amount: selectedFlight.price?.amount || selectedFlight.price?.total || 0,
+            total_currency: selectedFlight.price?.currency || 'EUR',
+            expires_at: selectedFlight.expires_at,
+            slices: selectedFlight.slices || [],
+            // Ajouter d'autres champs Duffel si disponibles
+            ...(selectedFlight.duffelOffer || {})
+        };
+    }
+    
+    // Option 4: Fallback - créer une structure minimale
+    console.warn('⚠️ Aucune donnée Duffel trouvée, création fallback');
+    const pricing = safeGetPricing(selectedFlight);
+    
+    return {
+        id: selectedFlight.id || `fallback_${Date.now()}`,
+        total_amount: pricing.amount || 0,
+        total_currency: pricing.currency || 'EUR',
+        expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // +30 min
+        slices: [],
+        _fallback: true,
+        _originalFlight: selectedFlight
+    };
 }
 
 // ====================
