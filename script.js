@@ -6,85 +6,7 @@ const API_BASE_URL = 'https://amibio.app.n8n.cloud/webhook';
 
 // ENDPOINTS SIMPLIFIÉS - Moins d'appels backend
 const API_ENDPOINTS = {
-    search: `${API_BASE_URL}
-
-// ====================
-// FONCTION POUR DONNEES DUMMY (TESTS)
-// ====================
-
-function fillDummyData() {
-    console.log('Remplissage avec donnees de test');
-    
-    // Donnees dummy pour faciliter les tests
-    var dummyData = {
-        firstName: 'Jean',
-        lastName: 'Dupont',
-        dateOfBirth: '1985-06-15',
-        gender: 'MALE',
-        email: 'jean.dupont@example.com',
-        phone: '+32 2 123 45 67',
-        passportNumber: 'BE123456789'
-    };
-    
-    // Recuperer les champs un par un avec verification
-    var fields = {
-        firstName: document.getElementById('firstName'),
-        lastName: document.getElementById('lastName'),
-        dateOfBirth: document.getElementById('dateOfBirth'),
-        gender: document.getElementById('gender'),
-        email: document.getElementById('email'),
-        phone: document.getElementById('phone'),
-        passportNumber: document.getElementById('passportNumber')
-    };
-    
-    // Compteur de champs remplis
-    var filledCount = 0;
-    
-    // Remplir chaque champ et appliquer l'animation
-    var fieldNames = Object.keys(fields);
-    for (var i = 0; i < fieldNames.length; i++) {
-        var fieldName = fieldNames[i];
-        var field = fields[fieldName];
-        var value = dummyData[fieldName];
-        
-        if (field && value) {
-            // Remplir la valeur
-            field.value = value;
-            filledCount++;
-            
-            // Animation visuelle securisee
-            try {
-                var originalBackground = field.style.backgroundColor || '';
-                field.style.backgroundColor = '#dcfce7';
-                field.style.transition = 'background-color 0.3s ease';
-                
-                // Utiliser une closure pour capturer les valeurs
-                (function(currentField, originalBg) {
-                    setTimeout(function() {
-                        currentField.style.backgroundColor = originalBg;
-                        setTimeout(function() {
-                            currentField.style.transition = '';
-                        }, 300);
-                    }, 1000);
-                })(field, originalBackground);
-                
-            } catch (animError) {
-                console.warn('Animation echouee pour ' + fieldName + ':', animError.message);
-            }
-        } else {
-            console.warn('Champ ' + fieldName + ' non trouve ou valeur manquante');
-        }
-    }
-    
-    console.log(filledCount + ' champs pre-remplis avec donnees de test');
-    
-    // Message de confirmation seulement si des champs ont ete remplis
-    if (filledCount > 0) {
-        addMessage('Formulaire pre-rempli avec donnees de test Jean Dupont (' + filledCount + ' champs)', false);
-    } else {
-        addMessage('Erreur: Impossible de remplir le formulaire - champs non trouves', false);
-    }
-}/flight-search`,           // ✅ Nécessaire pour rechercher
+    search: `${API_BASE_URL}/flight-search`,           // ✅ Nécessaire pour rechercher
     bookingConfirm: `${API_BASE_URL}/booking-confirm`  // ✅ Nécessaire pour réserver final
     // select: SUPPRIMÉ - Traitement local
     // passengerData: SUPPRIMÉ - Validation locale
@@ -317,7 +239,7 @@ function fillExample(text) {
 // ====================
 
 async function searchFlights() {
-    var userMessage = document.getElementById('userMessage').value.trim();
+    const userMessage = document.getElementById('userMessage').value.trim();
     
     if (!userMessage) {
         addMessage('Veuillez entrer votre recherche de vol.', false);
@@ -329,36 +251,25 @@ async function searchFlights() {
     addMessage('Recherche en cours...', false);
 
     try {
-        console.log('Tentative de connexion a:', API_ENDPOINTS.search);
-        
-        var response = await fetch(API_ENDPOINTS.search, {
+        const response = await fetch(API_ENDPOINTS.search, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({
                 message: userMessage,
                 sessionId: bookingState.sessionId
-            }),
-            // Ajout du timeout et des options de fetch
-            signal: AbortSignal.timeout(30000) // 30 secondes timeout
+            })
         });
 
-        console.log('Reponse recue:', response.status, response.statusText);
-
-        if (!response.ok) {
-            throw new Error('Erreur serveur: ' + response.status + ' ' + response.statusText);
-        }
-
-        var data = await response.json();
-        console.log('Donnees de reponse:', data);
+        const data = await response.json();
+        console.log('Réponse recherche:', data);
 
         if (data.success && data.bestFlights && data.bestFlights.length > 0) {
             displayFlightResults(data);
         } else {
-            var errorMsg = data.message || 'Aucun vol trouve pour votre recherche.';
-            addMessage('❌ ' + errorMsg, false);
+            const errorMsg = data.message || 'Aucun vol trouvé pour votre recherche.';
+            addMessage(`❌ ${errorMsg}`, false);
             
             if (data.suggestions && data.suggestions.length > 0) {
                 addMessage('💡 Suggestions:\n' + data.suggestions.join('\n'), false);
@@ -368,28 +279,8 @@ async function searchFlights() {
         document.getElementById('userMessage').value = '';
 
     } catch (error) {
-        console.error('Erreur recherche detaillee:', error);
-        
-        var errorMessage = '';
-        
-        // Diagnostic specifique selon le type d'erreur
-        if (error.name === 'TypeError' && error.message.includes('fetch')) {
-            errorMessage = '🌐 Probleme de connexion: Verifiez que votre workflow n8n est actif et accessible.';
-        } else if (error.name === 'AbortError') {
-            errorMessage = '⏱️ Timeout: Le serveur met trop de temps a repondre.';
-        } else if (error.message.includes('CORS')) {
-            errorMessage = '🔒 Erreur CORS: Probleme de politique de securite.';
-        } else if (error.message.includes('404')) {
-            errorMessage = '🔍 Endpoint non trouve: Verifiez l\'URL de votre webhook n8n.';
-        } else {
-            errorMessage = '❌ Erreur de connexion: ' + error.message;
-        }
-        
-        addMessage(errorMessage, false);
-        
-        // Informations de debugging
-        addMessage('🔧 URL testee: ' + API_ENDPOINTS.search, false);
-        addMessage('💡 Verifications a faire:\n• Workflow n8n actif\n• URL webhook correcte\n• Pas de firewall bloquant', false);
+        console.error('Erreur recherche:', error);
+        addMessage('❌ Erreur lors de la recherche. Veuillez réessayer.', false);
     }
 }
 
@@ -652,18 +543,6 @@ function showPassengerForm() {
             </div>
             
             <div style="background: white; color: #1f2937; border-radius: 12px; padding: 20px;">
-                
-                <!-- Bouton de test avec données dummy -->
-                <div style="text-align: center; margin-bottom: 15px; padding: 10px; background: #fef3c7; border-radius: 8px;">
-                    <div style="font-size: 12px; color: #92400e; margin-bottom: 8px;">
-                        <strong>🧪 MODE TEST</strong> - Remplissage automatique pour tests
-                    </div>
-                    <button onclick="fillDummyData()" 
-                            style="background: #f59e0b; color: white; border: none; padding: 6px 16px; border-radius: 16px; font-size: 12px; cursor: pointer;">
-                        ⚡ Remplir avec données de test
-                    </button>
-                </div>
-                
                 <form id="passengerForm">
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
                         <div>
@@ -785,342 +664,4 @@ function validatePassengerData(formData) {
     }
     
     // Validation nom
-    if (!formData.lastName || formData.lastName.length < 2) {
-        errors.push('Nom requis (minimum 2 caractères)');
-    }
-    
-    // Validation date de naissance
-    if (!formData.dateOfBirth) {
-        errors.push('Date de naissance requise');
-    } else {
-        const birthDate = new Date(formData.dateOfBirth);
-        const today = new Date();
-        const age = today.getFullYear() - birthDate.getFullYear();
-        
-        if (age < 0 || age > 120) {
-            errors.push('Date de naissance invalide');
-        }
-        if (age < 18) {
-            console.log('⚠️ Passager mineur détecté');
-            // On pourrait ajouter des validations spécifiques pour mineurs
-        }
-    }
-    
-    // Validation genre
-    if (!formData.gender || !['MALE', 'FEMALE'].includes(formData.gender)) {
-        errors.push('Genre requis');
-    }
-    
-    // Validation email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!formData.email || !emailRegex.test(formData.email)) {
-        errors.push('Email valide requis');
-    }
-    
-    // Validation téléphone
-    if (!formData.phone || formData.phone.length < 10) {
-        errors.push('Téléphone valide requis');
-    }
-    
-    // Validation passeport
-    if (!formData.passportNumber || formData.passportNumber.length < 6) {
-        errors.push('Numéro de passeport requis (minimum 6 caractères)');
-    }
-    
-    return errors;
-}
-
-// ====================
-// CONFIRMATION DE RÉSERVATION
-// ====================
-
-function showBookingConfirmation() {
-    console.log('Showing booking confirmation - local');
-    
-    const pricing = safeGetPricing(bookingState.selectedFlight);
-    const passenger = safeGetPassengerData(bookingState.passengers?.[0]);
-    
-    const confirmationHtml = `
-        <div style="background: linear-gradient(135deg, #dc2626, #ef4444); color: white; border-radius: 16px; padding: 20px; margin: 15px 0;">
-            <div style="text-align: center; margin-bottom: 20px;">
-                <div style="font-size: 20px; font-weight: bold;">🎯 Confirmation de Réservation</div>
-                <div style="font-size: 14px; opacity: 0.9;">Vérifiez vos informations avant de confirmer</div>
-            </div>
-            
-            <div style="background: white; color: #1f2937; border-radius: 12px; padding: 20px;">
-                
-                <div style="margin-bottom: 15px;">
-                    <h4 style="margin: 0 0 8px 0; color: #1f2937;">✈️ Vol sélectionné</h4>
-                    <div style="font-size: 14px; color: #6b7280;">
-                        ${bookingState.selectedFlight?.airline?.name || 'Compagnie aérienne'}<br>
-                        Prix: ${pricing.formatted}
-                    </div>
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    <h4 style="margin: 0 0 8px 0; color: #1f2937;">👤 Passager</h4>
-                    <div style="font-size: 14px; color: #6b7280;">
-                        ${passenger.fullName}<br>
-                        ${bookingState.contact?.email || 'Email non disponible'}
-                    </div>
-                </div>
-                
-                <div style="background: #fef3c7; padding: 12px; border-radius: 8px; margin: 15px 0;">
-                    <div style="font-size: 13px; color: #92400e;">
-                        <strong>⚠️ Simulation de réservation</strong><br>
-                        Ceci est une démonstration. Une réservation sera créée via n8n/Duffel.
-                    </div>
-                </div>
-                
-                <div style="display: flex; gap: 10px; justify-content: center;">
-                    <button onclick="showPassengerForm()" 
-                            style="background: #6b7280; color: white; border: none; padding: 12px 24px; border-radius: 20px; font-weight: 600; cursor: pointer;">
-                        ← Modifier passager
-                    </button>
-                    <button onclick="confirmBooking()" 
-                            style="background: linear-gradient(135deg, #dc2626, #b91c1c); color: white; border: none; padding: 12px 30px; border-radius: 20px; font-weight: 600; cursor: pointer;">
-                        🎯 Confirmer la réservation
-                    </button>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    addMessage(confirmationHtml, false, true);
-}
-
-// ====================
-// CONFIRMATION FINALE - SEUL CONTACT BACKEND RESTANT
-// ====================
-
-async function confirmBooking() {
-    console.log('Confirmation finale - Contact backend pour réservation');
-    
-    addMessage('🎯 Finalisation de votre réservation...', false);
-
-    try {
-        const passenger = safeGetPassengerData(bookingState.passengers?.[0]);
-        const duffelOffer = extractDuffelData(bookingState.selectedFlight);
-        
-        // SEUL APPEL BACKEND - Pour la réservation finale
-        const response = await fetch(API_ENDPOINTS.bookingConfirm, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                sessionId: bookingState.sessionId,
-                
-                // Données vol avec Duffel natif
-                flightId: duffelOffer.id || bookingState.selectedFlight?.id,
-                selectedFlight: {
-                    ...bookingState.selectedFlight,
-                    duffelData: duffelOffer
-                },
-                
-                // Données passager validées localement
-                passengers: [{
-                    firstName: passenger.firstName,
-                    lastName: passenger.lastName,
-                    name: {
-                        firstName: passenger.firstName,
-                        lastName: passenger.lastName
-                    },
-                    dateOfBirth: passenger.dateOfBirth,
-                    gender: passenger.gender,
-                    // Ajouter données passeport si nécessaire
-                    passportNumber: passenger.passportNumber || ''
-                }],
-                
-                // Contact
-                contact: bookingState.contact,
-                
-                // Métadonnées de réservation
-                payment: {
-                    method: 'simulation',
-                    status: 'pending'
-                },
-                metadata: {
-                    bookingSource: 'web_simplified',
-                    timestamp: new Date().toISOString(),
-                    userAgent: navigator.userAgent
-                }
-            })
-        });
-
-        const data = await response.json();
-        console.log('Réponse confirmation backend:', data);
-
-        if (data.success || data.webResponse?.success) {
-            bookingState.currentStep = 'completed';
-            
-            // Afficher le résultat final
-            const finalResponse = data.webResponse || data;
-            if (finalResponse.html) {
-                addMessage(finalResponse.html, false, true);
-            } else {
-                showBookingSuccess(data);
-            }
-            
-        } else {
-            const errorMsg = data.message || 'Erreur lors de la confirmation.';
-            addMessage(`❌ ${errorMsg}`, false);
-            
-            // En cas d'erreur, proposer de recommencer
-            setTimeout(() => {
-                addMessage('Voulez-vous recommencer la réservation ?', false);
-                addBookingRetryButton();
-            }, 2000);
-        }
-
-    } catch (error) {
-        console.error('Erreur confirmation:', error);
-        addMessage('❌ Erreur de connexion. Veuillez réessayer.', false);
-        
-        setTimeout(() => {
-            addBookingRetryButton();
-        }, 2000);
-    }
-}
-
-// ====================
-// AFFICHAGE SUCCÈS LOCAL (si pas de HTML backend)
-// ====================
-
-function showBookingSuccess(data) {
-    const passenger = safeGetPassengerData(bookingState.passengers?.[0]);
-    const pricing = safeGetPricing(bookingState.selectedFlight);
-    const confirmationNumber = data.confirmationNumber || `WEB${Date.now()}`;
-    
-    const successHtml = `
-        <div style="background: linear-gradient(135deg, #059669, #10b981); color: white; border-radius: 16px; padding: 25px; margin: 15px 0;">
-            <div style="text-align: center; margin-bottom: 25px;">
-                <div style="font-size: 24px; margin-bottom: 10px;">🎉</div>
-                <div style="font-size: 20px; font-weight: bold;">Réservation Confirmée !</div>
-                <div style="font-size: 14px; opacity: 0.9;">Numéro de confirmation: ${confirmationNumber}</div>
-            </div>
-            
-            <div style="background: white; color: #1f2937; border-radius: 12px; padding: 20px;">
-                
-                <div style="text-align: center; margin-bottom: 20px;">
-                    <div style="background: #ecfdf5; color: #065f46; padding: 12px; border-radius: 8px; margin-bottom: 15px;">
-                        <strong>✅ Votre vol est réservé</strong><br>
-                        Un email de confirmation va vous être envoyé à ${bookingState.contact.email}
-                    </div>
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    <h4 style="margin: 0 0 8px 0; color: #1f2937;">👤 Passager</h4>
-                    <div style="font-size: 14px; color: #6b7280;">
-                        ${passenger.fullName}<br>
-                        ${bookingState.contact?.email || 'Email non disponible'}
-                    </div>
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    <h4 style="margin: 0 0 8px 0; color: #1f2937;">✈️ Vol</h4>
-                    <div style="font-size: 14px; color: #6b7280;">
-                        ${bookingState.selectedFlight?.airline?.name || 'Compagnie aérienne'}<br>
-                        Prix total: ${pricing.formatted}
-                    </div>
-                </div>
-                
-                <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;">
-                    <button onclick="downloadTicket('${confirmationNumber}')" 
-                            style="background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 20px; font-weight: 600; cursor: pointer;">
-                        📄 Télécharger billet
-                    </button>
-                    <button onclick="resetBooking()" 
-                            style="background: #10b981; color: white; border: none; padding: 10px 20px; border-radius: 20px; font-weight: 600; cursor: pointer;">
-                        🔍 Nouvelle recherche
-                    </button>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    addMessage(successHtml, false, true);
-}
-
-// ====================
-// GESTION D'ERREUR - BOUTON RETRY
-// ====================
-
-function addBookingRetryButton() {
-    const retryHtml = `
-        <div style="text-align: center; margin: 15px 0;">
-            <button onclick="showBookingConfirmation()" 
-                    style="background: #f59e0b; color: white; border: none; padding: 10px 20px; border-radius: 20px; font-weight: 600; cursor: pointer;">
-                🔄 Réessayer la réservation
-            </button>
-            <button onclick="resetBooking()" 
-                    style="background: #6b7280; color: white; border: none; padding: 10px 20px; border-radius: 20px; font-weight: 600; cursor: pointer; margin-left: 10px;">
-                🏠 Recommencer
-            </button>
-        </div>
-    `;
-    
-    addMessage(retryHtml, false, true);
-}
-
-// ====================
-// FONCTIONS UTILITAIRES
-// ====================
-
-function resetBooking() {
-    console.log('Reset booking state');
-    bookingState = {
-        selectedFlight: null,
-        passengers: [],
-        contact: {},
-        currentStep: 'search',
-        sessionId: 'web-' + Date.now(),
-        pricing: null,
-        searchResults: null,
-        searchParams: null
-    };
-    
-    addMessage('Nouvelle recherche initialisée. Que puis-je vous aider à trouver ?', false);
-}
-
-function downloadTicket(confirmationNumber) {
-    console.log('Download ticket:', confirmationNumber);
-    addMessage(`📄 Fonction de téléchargement à implémenter pour: ${confirmationNumber}`, false);
-    
-    // Ici on pourrait implémenter:
-    // - Génération PDF du billet
-    // - Téléchargement automatique
-    // - Envoi par email
-}
-
-// ====================
-// INITIALISATION
-// ====================
-
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('Flight Bot Interface initialisée - Version Simplifiée');
-    
-    const userMessageInput = document.getElementById('userMessage');
-    if (userMessageInput) {
-        // Enter pour envoyer
-        userMessageInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                searchFlights();
-            }
-        });
-        
-        // Auto-resize du textarea
-        userMessageInput.addEventListener('input', function() {
-            this.style.height = 'auto';
-            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
-        });
-    }
-    
-    // Message de bienvenue avec bouton de test
-    addMessage('Bonjour ! Je suis votre assistant de réservation de vols. Dites-moi où vous souhaitez aller et quand !', false);
-    
-    // Ajouter un bouton de test de connectivité
-    var testButtonHtml = '<div style="text-align: center; margin: 10px 0;"><button onclick="testConnection()" style="background: #6b7280; color: white; border: none; padding: 8px 16px; border-radius: 12px; cursor: pointer;">🔧 Tester la connexion n8n</button></div>';
-    addMessage(testButtonHtml, false, true);
-});
+    if (!form
