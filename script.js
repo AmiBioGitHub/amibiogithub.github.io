@@ -66,7 +66,7 @@ function fillDummyData() {
                 }, 1000);
                 
             } catch (animError) {
-                console.warn(`Animation échouée pour ${fieldName}:`, animError.message);
+                console.warn('Animation echouee pour ' + fieldName + ':', animError.message);
             }
         } else {
             console.warn(`Champ ${fieldName} non trouvé ou valeur manquante`);
