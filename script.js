@@ -9,14 +9,14 @@ const API_ENDPOINTS = {
     search: `${API_BASE_URL}
 
 // ====================
-// FONCTION POUR DONNÉES DUMMY (TESTS)
+// FONCTION POUR DONNEES DUMMY (TESTS)
 // ====================
 
 function fillDummyData() {
-    console.log('Remplissage avec données de test');
+    console.log('Remplissage avec donnees de test');
     
-    // Données dummy pour faciliter les tests
-    const dummyData = {
+    // Donnees dummy pour faciliter les tests
+    var dummyData = {
         firstName: 'Jean',
         lastName: 'Dupont',
         dateOfBirth: '1985-06-15',
@@ -26,8 +26,8 @@ function fillDummyData() {
         passportNumber: 'BE123456789'
     };
     
-    // Récupérer les champs un par un avec vérification
-    const fields = {
+    // Recuperer les champs un par un avec verification
+    var fields = {
         firstName: document.getElementById('firstName'),
         lastName: document.getElementById('lastName'),
         dateOfBirth: document.getElementById('dateOfBirth'),
@@ -38,32 +38,35 @@ function fillDummyData() {
     };
     
     // Compteur de champs remplis
-    let filledCount = 0;
+    var filledCount = 0;
     
     // Remplir chaque champ et appliquer l'animation
-    Object.keys(fields).forEach(fieldName => {
-        const field = fields[fieldName];
-        const value = dummyData[fieldName];
+    var fieldNames = Object.keys(fields);
+    for (var i = 0; i < fieldNames.length; i++) {
+        var fieldName = fieldNames[i];
+        var field = fields[fieldName];
+        var value = dummyData[fieldName];
         
         if (field && value) {
             // Remplir la valeur
             field.value = value;
             filledCount++;
             
-            // Animation visuelle sécurisée
+            // Animation visuelle securisee
             try {
-                const originalBackground = field.style.backgroundColor || '';
-                field.style.backgroundColor = '#dcfce7'; // Vert clair
+                var originalBackground = field.style.backgroundColor || '';
+                field.style.backgroundColor = '#dcfce7';
                 field.style.transition = 'background-color 0.3s ease';
                 
-                // Restaurer le style original après l'animation
-                setTimeout(() => {
-                    field.style.backgroundColor = originalBackground;
-                    // Nettoyer la transition après l'animation
-                    setTimeout(() => {
-                        field.style.transition = '';
-                    }, 300);
-                }, 1000);
+                // Utiliser une closure pour capturer les valeurs
+                (function(currentField, originalBg) {
+                    setTimeout(function() {
+                        currentField.style.backgroundColor = originalBg;
+                        setTimeout(function() {
+                            currentField.style.transition = '';
+                        }, 300);
+                    }, 1000);
+                })(field, originalBackground);
                 
             } catch (animError) {
                 console.warn('Animation echouee pour ' + fieldName + ':', animError.message);
@@ -71,15 +74,15 @@ function fillDummyData() {
         } else {
             console.warn('Champ ' + fieldName + ' non trouve ou valeur manquante');
         }
-    });
+    }
     
-    console.log(`✅ ${filledCount} champs pré-remplis avec données de test`);
+    console.log(filledCount + ' champs pre-remplis avec donnees de test');
     
-    // Message de confirmation seulement si des champs ont été remplis
+    // Message de confirmation seulement si des champs ont ete remplis
     if (filledCount > 0) {
-        addMessage(`✅ Formulaire pré-rempli avec données de test Jean Dupont (${filledCount} champs)`, false);
+        addMessage('Formulaire pre-rempli avec donnees de test Jean Dupont (' + filledCount + ' champs)', false);
     } else {
-        addMessage('❌ Erreur: Impossible de remplir le formulaire - champs non trouvés', false);
+        addMessage('Erreur: Impossible de remplir le formulaire - champs non trouves', false);
     }
 }/flight-search`,           // ✅ Nécessaire pour rechercher
     bookingConfirm: `${API_BASE_URL}/booking-confirm`  // ✅ Nécessaire pour réserver final
