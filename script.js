@@ -6,7 +6,58 @@ const API_BASE_URL = 'https://amibio.app.n8n.cloud/webhook';
 
 // ENDPOINTS SIMPLIFIÉS - Moins d'appels backend
 const API_ENDPOINTS = {
-    search: `${API_BASE_URL}/flight-search`,           // ✅ Nécessaire pour rechercher
+    search: `${API_BASE_URL}
+
+// ====================
+// FONCTION POUR DONNÉES DUMMY (TESTS)
+// ====================
+
+function fillDummyData() {
+    console.log('Remplissage avec données de test');
+    
+    // Données dummy pour faciliter les tests
+    const dummyData = {
+        firstName: 'Jean',
+        lastName: 'Dupont',
+        dateOfBirth: '1985-06-15',
+        gender: 'MALE',
+        email: 'jean.dupont@example.com',
+        phone: '+32 2 123 45 67',
+        passportNumber: 'BE123456789'
+    };
+    
+    // Remplir les champs
+    const firstNameField = document.getElementById('firstName');
+    const lastNameField = document.getElementById('lastName');
+    const dateOfBirthField = document.getElementById('dateOfBirth');
+    const genderField = document.getElementById('gender');
+    const emailField = document.getElementById('email');
+    const phoneField = document.getElementById('phone');
+    const passportNumberField = document.getElementById('passportNumber');
+    
+    if (firstNameField) firstNameField.value = dummyData.firstName;
+    if (lastNameField) lastNameField.value = dummyData.lastName;
+    if (dateOfBirthField) dateOfBirthField.value = dummyData.dateOfBirth;
+    if (genderField) genderField.value = dummyData.gender;
+    if (emailField) emailField.value = dummyData.email;
+    if (phoneField) phoneField.value = dummyData.phone;
+    if (passportNumberField) passportNumberField.value = dummyData.passportNumber;
+    
+    // Animation visuelle pour confirmer le remplissage
+    [firstNameField, lastNameField, dateOfBirthField, genderField, emailField, phoneField, passportNumberField].forEach(field => {
+        if (field) {
+            field.style.background = '#dcfce7'; // Vert clair
+            setTimeout(() => {
+                field.style.background = '';
+            }, 1000);
+        }
+    });
+    
+    console.log('✅ Formulaire pré-rempli avec données de test');
+    
+    // Message de confirmation
+    addMessage('✅ Formulaire pré-rempli avec données de test Jean Dupont', false);
+}/flight-search`,           // ✅ Nécessaire pour rechercher
     bookingConfirm: `${API_BASE_URL}/booking-confirm`  // ✅ Nécessaire pour réserver final
     // select: SUPPRIMÉ - Traitement local
     // passengerData: SUPPRIMÉ - Validation locale
@@ -543,6 +594,18 @@ function showPassengerForm() {
             </div>
             
             <div style="background: white; color: #1f2937; border-radius: 12px; padding: 20px;">
+                
+                <!-- Bouton de test avec données dummy -->
+                <div style="text-align: center; margin-bottom: 15px; padding: 10px; background: #fef3c7; border-radius: 8px;">
+                    <div style="font-size: 12px; color: #92400e; margin-bottom: 8px;">
+                        <strong>🧪 MODE TEST</strong> - Remplissage automatique pour tests
+                    </div>
+                    <button onclick="fillDummyData()" 
+                            style="background: #f59e0b; color: white; border: none; padding: 6px 16px; border-radius: 16px; font-size: 12px; cursor: pointer;">
+                        ⚡ Remplir avec données de test
+                    </button>
+                </div>
+                
                 <form id="passengerForm">
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
                         <div>
