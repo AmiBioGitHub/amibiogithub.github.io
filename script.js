@@ -317,7 +317,7 @@ function fillExample(text) {
 // ====================
 
 async function searchFlights() {
-    const userMessage = document.getElementById('userMessage').value.trim();
+    var userMessage = document.getElementById('userMessage').value.trim();
     
     if (!userMessage) {
         addMessage('Veuillez entrer votre recherche de vol.', false);
@@ -329,25 +329,36 @@ async function searchFlights() {
     addMessage('Recherche en cours...', false);
 
     try {
-        const response = await fetch(API_ENDPOINTS.search, {
+        console.log('Tentative de connexion a:', API_ENDPOINTS.search);
+        
+        var response = await fetch(API_ENDPOINTS.search, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
             },
             body: JSON.stringify({
                 message: userMessage,
                 sessionId: bookingState.sessionId
-            })
+            }),
+            // Ajout du timeout et des options de fetch
+            signal: AbortSignal.timeout(30000) // 30 secondes timeout
         });
 
-        const data = await response.json();
-        console.log('Réponse recherche:', data);
+        console.log('Reponse recue:', response.status, response.statusText);
+
+        if (!response.ok) {
+            throw new Error('Erreur serveur: ' + response.status + ' ' + response.statusText);
+        }
+
+        var data = await response.json();
+        console.log('Donnees de reponse:', data);
 
         if (data.success && data.bestFlights && data.bestFlights.length > 0) {
             displayFlightResults(data);
         } else {
-            const errorMsg = data.message || 'Aucun vol trouvé pour votre recherche.';
-            addMessage(`❌ ${errorMsg}`, false);
+            var errorMsg = data.message || 'Aucun vol trouve pour votre recherche.';
+            addMessage('❌ ' + errorMsg, false);
             
             if (data.suggestions && data.suggestions.length > 0) {
                 addMessage('💡 Suggestions:\n' + data.suggestions.join('\n'), false);
@@ -357,8 +368,28 @@ async function searchFlights() {
         document.getElementById('userMessage').value = '';
 
     } catch (error) {
-        console.error('Erreur recherche:', error);
-        addMessage('❌ Erreur lors de la recherche. Veuillez réessayer.', false);
+        console.error('Erreur recherche detaillee:', error);
+        
+        var errorMessage = '';
+        
+        // Diagnostic specifique selon le type d'erreur
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+            errorMessage = '🌐 Probleme de connexion: Verifiez que votre workflow n8n est actif et accessible.';
+        } else if (error.name === 'AbortError') {
+            errorMessage = '⏱️ Timeout: Le serveur met trop de temps a repondre.';
+        } else if (error.message.includes('CORS')) {
+            errorMessage = '🔒 Erreur CORS: Probleme de politique de securite.';
+        } else if (error.message.includes('404')) {
+            errorMessage = '🔍 Endpoint non trouve: Verifiez l\'URL de votre webhook n8n.';
+        } else {
+            errorMessage = '❌ Erreur de connexion: ' + error.message;
+        }
+        
+        addMessage(errorMessage, false);
+        
+        // Informations de debugging
+        addMessage('🔧 URL testee: ' + API_ENDPOINTS.search, false);
+        addMessage('💡 Verifications a faire:\n• Workflow n8n actif\n• URL webhook correcte\n• Pas de firewall bloquant', false);
     }
 }
 
@@ -1086,6 +1117,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Message de bienvenue
-    addMessage('👋 Bonjour ! Je suis votre assistant de réservation de vols. Dites-moi où vous souhaitez aller et quand !', false);
+    // Message de bienvenue avec bouton de test
+    addMessage('Bonjour ! Je suis votre assistant de réservation de vols. Dites-moi où vous souhaitez aller et quand !', false);
+    
+    // Ajouter un bouton de test de connectivité
+    var testButtonHtml = '<div style="text-align: center; margin: 10px 0;"><button onclick="testConnection()" style="background: #6b7280; color: white; border: none; padding: 8px 16px; border-radius: 12px; cursor: pointer;">🔧 Tester la connexion n8n</button></div>';
+    addMessage(testButtonHtml, false, true);
 });
