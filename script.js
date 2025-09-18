@@ -26,37 +26,61 @@ function fillDummyData() {
         passportNumber: 'BE123456789'
     };
     
-    // Remplir les champs
-    const firstNameField = document.getElementById('firstName');
-    const lastNameField = document.getElementById('lastName');
-    const dateOfBirthField = document.getElementById('dateOfBirth');
-    const genderField = document.getElementById('gender');
-    const emailField = document.getElementById('email');
-    const phoneField = document.getElementById('phone');
-    const passportNumberField = document.getElementById('passportNumber');
+    // Récupérer les champs un par un avec vérification
+    const fields = {
+        firstName: document.getElementById('firstName'),
+        lastName: document.getElementById('lastName'),
+        dateOfBirth: document.getElementById('dateOfBirth'),
+        gender: document.getElementById('gender'),
+        email: document.getElementById('email'),
+        phone: document.getElementById('phone'),
+        passportNumber: document.getElementById('passportNumber')
+    };
     
-    if (firstNameField) firstNameField.value = dummyData.firstName;
-    if (lastNameField) lastNameField.value = dummyData.lastName;
-    if (dateOfBirthField) dateOfBirthField.value = dummyData.dateOfBirth;
-    if (genderField) genderField.value = dummyData.gender;
-    if (emailField) emailField.value = dummyData.email;
-    if (phoneField) phoneField.value = dummyData.phone;
-    if (passportNumberField) passportNumberField.value = dummyData.passportNumber;
+    // Compteur de champs remplis
+    let filledCount = 0;
     
-    // Animation visuelle pour confirmer le remplissage
-    [firstNameField, lastNameField, dateOfBirthField, genderField, emailField, phoneField, passportNumberField].forEach(field => {
-        if (field) {
-            field.style.background = '#dcfce7'; // Vert clair
-            setTimeout(() => {
-                field.style.background = '';
-            }, 1000);
+    // Remplir chaque champ et appliquer l'animation
+    Object.keys(fields).forEach(fieldName => {
+        const field = fields[fieldName];
+        const value = dummyData[fieldName];
+        
+        if (field && value) {
+            // Remplir la valeur
+            field.value = value;
+            filledCount++;
+            
+            // Animation visuelle sécurisée
+            try {
+                const originalBackground = field.style.backgroundColor || '';
+                field.style.backgroundColor = '#dcfce7'; // Vert clair
+                field.style.transition = 'background-color 0.3s ease';
+                
+                // Restaurer le style original après l'animation
+                setTimeout(() => {
+                    field.style.backgroundColor = originalBackground;
+                    // Nettoyer la transition après l'animation
+                    setTimeout(() => {
+                        field.style.transition = '';
+                    }, 300);
+                }, 1000);
+                
+            } catch (animError) {
+                console.warn(`Animation échouée pour ${fieldName}:`, animError.message);
+            }
+        } else {
+            console.warn(`Champ ${fieldName} non trouvé ou valeur manquante`);
         }
     });
     
-    console.log('✅ Formulaire pré-rempli avec données de test');
+    console.log(`✅ ${filledCount} champs pré-remplis avec données de test`);
     
-    // Message de confirmation
-    addMessage('✅ Formulaire pré-rempli avec données de test Jean Dupont', false);
+    // Message de confirmation seulement si des champs ont été remplis
+    if (filledCount > 0) {
+        addMessage(`✅ Formulaire pré-rempli avec données de test Jean Dupont (${filledCount} champs)`, false);
+    } else {
+        addMessage('❌ Erreur: Impossible de remplir le formulaire - champs non trouvés', false);
+    }
 }/flight-search`,           // ✅ Nécessaire pour rechercher
     bookingConfirm: `${API_BASE_URL}/booking-confirm`  // ✅ Nécessaire pour réserver final
     // select: SUPPRIMÉ - Traitement local
