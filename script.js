@@ -69,7 +69,7 @@ function fillDummyData() {
                 console.warn('Animation echouee pour ' + fieldName + ':', animError.message);
             }
         } else {
-            console.warn(`Champ ${fieldName} non trouvé ou valeur manquante`);
+            console.warn('Champ ' + fieldName + ' non trouve ou valeur manquante');
         }
     });
     
