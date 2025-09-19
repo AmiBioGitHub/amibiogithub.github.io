@@ -22,7 +22,7 @@ function addMessage(content, isUser = false, isHtml = false) {
 
 
 
-    const messagesContainer = document.getElementById('messages');
+    const messagesContainer = document.getElementById('chatContainer');
 
     // Protection contre l'élément manquant
     if (!messagesContainer) {
