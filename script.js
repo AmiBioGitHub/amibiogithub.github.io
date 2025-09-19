@@ -1,7 +1,7 @@
 // ===== CONFIGURATION =====
 const API_ENDPOINTS = {
-    flightSearch: '/webhook/6c8894b0-7f31-4ea2-b8fb-25a99b7cc67f',
-    bookingConfirm: '/webhook/booking-confirm-webhook'
+    flightSearch: 'https://amibio.app.n8n.cloud/webhook/flight-search',
+    bookingConfirm: 'https://amibio.app.n8n.cloud/webhook/booking-confirm'
 };
 
 // ===== ÉTAT GLOBAL =====
