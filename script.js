@@ -293,7 +293,9 @@ function displayFlightResults(data) {
             <div style="text-align: center; margin-bottom: 15px;">
                 <div style="font-size: 20px; font-weight: bold;">✈️ Vols Disponibles</div>
                 <div style="font-size: 14px; opacity: 0.9;">
-                    ${searchParams.originCity || 'Origine'} → ${searchParams.destinationCity || 'Destination'}
+        
+                    ${searchParams.originCity || searchParams.originLocationCode || 'Origine'} → ${searchParams.destinationCity || searchParams.destinationLocationCode || 'Destination'}
+
                     ${searchParams.departureDate ? ` | ${new Date(searchParams.departureDate).toLocaleDateString('fr-FR')}` : ''}
                     ${searchParams.returnDate ? ` | Retour: ${new Date(searchParams.returnDate).toLocaleDateString('fr-FR')}` : ''}
                 </div>
@@ -503,42 +505,58 @@ function getAirlineNameFromCode(code) {
     return airlines[code] || `${code} Airlines`;
 }
 
+/ ====================
+// CORRECTION 1: Fonction formatDurationInternal - Version corrigée
+// Remplacez votre fonction existante par celle-ci
+// ====================
+
 function formatDurationInternal(duration) {
     if (!duration) return 'N/A';
     
+    console.log('Formatage durée input:', duration);
+    
     try {
-        // CORRECTION: Gérer le format PT1DT7H10M correctement
-        if (duration.toLowerCase().startsWith('pt')) {
+        // CORRECTION: Traitement correct des formats Duffel PT1DT7H10M
+        const durationStr = duration.toString().toLowerCase();
+        
+        if (durationStr.startsWith('pt') || durationStr.startsWith('p')) {
             let totalMinutes = 0;
             
-            // Extraire les jours, heures et minutes
-            const dayMatch = duration.match(/(\d+)d/i);
-            const hourMatch = duration.match(/(\d+)h/i);
-            const minMatch = duration.match(/(\d+)m/i);
+            // Pattern pour extraire jours, heures et minutes
+            const dayMatch = durationStr.match(/(\d+)d/);
+            const hourMatch = durationStr.match(/(\d+)h/);
+            const minMatch = durationStr.match(/(\d+)m(?!o)/); // Eviter "month"
             
             const days = dayMatch ? parseInt(dayMatch[1]) : 0;
             const hours = hourMatch ? parseInt(hourMatch[1]) : 0;
             const minutes = minMatch ? parseInt(minMatch[1]) : 0;
             
-            // Convertir tout en heures et minutes
+            console.log('Durée parsée:', { days, hours, minutes });
+            
+            // Convertir en heures et minutes totales
             const totalHours = (days * 24) + hours;
             
+            let result;
             if (totalHours > 0) {
-                return `${totalHours}h${minutes.toString().padStart(2, '0')}m`;
+                result = `${totalHours}h${minutes.toString().padStart(2, '0')}m`;
             } else {
-                return `${minutes}min`;
+                result = `${minutes}min`;
             }
+            
+            console.log('Durée formatée:', result);
+            return result;
         }
         
-        // Format déjà lisible
-        if (duration.includes('h') || duration.includes('H')) {
-            return duration.toLowerCase();
+        // Format déjà lisible (15h30m, etc.)
+        if (durationStr.includes('h')) {
+            return duration;
         }
         
         return duration;
+        
     } catch (error) {
-        console.warn('Erreur formatage durée:', duration, error);
-        return duration;
+        console.error('Erreur formatage durée:', error, 'Input:', duration);
+        return duration; // Retourner tel quel si erreur
     }
 }
 
@@ -558,6 +576,11 @@ function formatTimeFromISO(isoString) {
     }
 }
 
+/ ====================
+// CORRECTION 2: Fonction extractLayoverInfo - Version corrigée  
+// Remplacez votre fonction existante par celle-ci
+// ====================
+
 function extractLayoverInfo(flight, sliceIndex) {
     const layovers = [];
     
@@ -566,44 +589,75 @@ function extractLayoverInfo(flight, sliceIndex) {
             const slice = flight.duffelData.slices[sliceIndex];
             const segments = slice.segments || [];
             
-            // Calculer les correspondances entre segments
+            console.log(`Analyse escales slice ${sliceIndex}:`, segments.length, 'segments');
+            
+            // Calculer les correspondances entre segments consécutifs
             for (let i = 0; i < segments.length - 1; i++) {
                 const currentSegment = segments[i];
                 const nextSegment = segments[i + 1];
                 
+                console.log(`Segment ${i} -> ${i + 1}:`);
+                console.log('  Arrivée:', currentSegment.arriving_at);
+                console.log('  Départ suivant:', nextSegment.departing_at);
+                
                 if (currentSegment.arriving_at && nextSegment.departing_at) {
                     const arrivalTime = new Date(currentSegment.arriving_at);
                     const departureTime = new Date(nextSegment.departing_at);
-                    const layoverMinutes = (departureTime - arrivalTime) / (1000 * 60);
                     
-                    let duration;
-                    if (layoverMinutes < 60) {
-                        duration = `${Math.round(layoverMinutes)}min`;
+                    // CORRECTION: Calcul correct de la différence
+                    const layoverMilliseconds = departureTime.getTime() - arrivalTime.getTime();
+                    const layoverMinutes = layoverMilliseconds / (1000 * 60);
+                    
+                    console.log(`  Temps d'escale: ${layoverMinutes} minutes`);
+                    
+                    // Vérification que le calcul est sensé (entre 30min et 24h)
+                    if (layoverMinutes >= 30 && layoverMinutes <= 1440) {
+                        let duration;
+                        if (layoverMinutes < 60) {
+                            duration = `${Math.round(layoverMinutes)}min`;
+                        } else {
+                            const hours = Math.floor(layoverMinutes / 60);
+                            const mins = Math.round(layoverMinutes % 60);
+                            if (mins > 0) {
+                                duration = `${hours}h${mins.toString().padStart(2, '0')}m`;
+                            } else {
+                                duration = `${hours}h`;
+                            }
+                        }
+                        
+                        // Statut de la correspondance
+                        let status = '✅'; // OK
+                        if (layoverMinutes < 60) {
+                            status = '⚠️'; // Court
+                        } else if (layoverMinutes > 300) { // Plus de 5h
+                            status = '⏰'; // Long
+                        }
+                        
+                        layovers.push({
+                            airport: currentSegment.destination?.iata_code || 'XXX',
+                            airportName: currentSegment.destination?.name || 'Aéroport',
+                            duration: duration,
+                            durationMinutes: layoverMinutes,
+                            status: status
+                        });
+                        
+                        console.log(`  Escale ajoutée: ${currentSegment.destination?.iata_code} - ${duration} ${status}`);
                     } else {
-                        const hours = Math.floor(layoverMinutes / 60);
-                        const mins = Math.round(layoverMinutes % 60);
-                        duration = `${hours}h${mins.toString().padStart(2, '0')}m`;
+                        console.warn(`  Durée d'escale anormale: ${layoverMinutes} minutes - ignorée`);
                     }
-                    
-                    // Statut de la correspondance
-                    let status = '✅';
-                    if (layoverMinutes < 60) status = '⚠️';
-                    else if (layoverMinutes > 300) status = '⏰';
-                    
-                    layovers.push({
-                        airport: currentSegment.destination?.iata_code || 'XXX',
-                        duration: duration,
-                        status: status
-                    });
+                } else {
+                    console.warn(`  Données manquantes pour calculer l'escale ${i}->${i + 1}`);
                 }
             }
         }
     } catch (error) {
-        console.warn('Erreur extraction escales:', error);
+        console.error('Erreur extraction escales:', error);
     }
     
+    console.log(`Escales extraites pour slice ${sliceIndex}:`, layovers.length, layovers);
     return layovers;
 }
+
 
 // ====================
 // SÉLECTION DE VOL - LOCAL
