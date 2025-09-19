@@ -505,7 +505,7 @@ function getAirlineNameFromCode(code) {
     return airlines[code] || `${code} Airlines`;
 }
 
-/ ====================
+// ====================
 // CORRECTION 1: Fonction formatDurationInternal - Version corrigée
 // Remplacez votre fonction existante par celle-ci
 // ====================
