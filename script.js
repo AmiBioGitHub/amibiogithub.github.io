@@ -19,7 +19,16 @@ let bookingState = {
 
 // ===== FONCTIONS UTILITAIRES =====
 function addMessage(content, isUser = false, isHtml = false) {
+
+
+
     const messagesContainer = document.getElementById('messages');
+
+    // Protection contre l'élément manquant
+    if (!messagesContainer) {
+        console.error('Élément #messages non trouvé dans le HTML');
+        return;
+    }
     const messageDiv = document.createElement('div');
     messageDiv.className = isUser ? 'message user-message' : 'message bot-message';
     
