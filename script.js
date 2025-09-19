@@ -183,7 +183,12 @@ function addMessage(content, isUser = false, isHtml = false) {
     messageDiv.appendChild(avatarDiv);
     messageDiv.appendChild(bubbleDiv);
     chatContainer.appendChild(messageDiv);
-    chatContainer.scrollTop = chatContainer.scrollHeight;
+    setTimeout(() => {
+    chatContainer.scrollTo({
+        top: chatContainer.scrollHeight,
+        behavior: 'smooth'
+    });
+}, 100);
 }
 
 function fillExample(text) {
@@ -200,6 +205,12 @@ function fillExample(text) {
 // RECHERCHE DE VOLS
 // ====================
 
+
+// ====================
+// CORRECTION 1: Nettoyage de l'input après recherche
+// Dans votre fonction searchFlights, AJOUTEZ cette ligne au début
+// ====================
+
 async function searchFlights() {
     var userMessage = document.getElementById('userMessage').value.trim();
     
@@ -213,6 +224,13 @@ async function searchFlights() {
     
     addMessage(userMessage, true);
     addMessage('🔍 Recherche en cours...', false);
+
+    // AJOUT: Nettoyer l'input immédiatement après avoir affiché le message
+    document.getElementById('userMessage').value = '';
+    const messageInput = document.getElementById('userMessage');
+    if (messageInput) {
+        messageInput.style.height = 'auto'; // Reset hauteur aussi
+    }
 
     try {
         const response = await fetch(API_ENDPOINTS.search, {
@@ -248,7 +266,8 @@ async function searchFlights() {
             }
         }
 
-        document.getElementById('userMessage').value = '';
+        // SUPPRIMEZ cette ligne puisque c'est fait au début maintenant :
+        // document.getElementById('userMessage').value = '';
 
     } catch (error) {
         console.error('Erreur recherche détaillée:', error);
@@ -678,6 +697,17 @@ function selectFlight(flightIndex) {
     bookingState.currentStep = 'selected';
     
     showSelectedFlightSummary(selectedFlight);
+
+    // Auto-scroll après sélection
+setTimeout(() => {
+    const chatContainer = document.getElementById('chatContainer');
+    if (chatContainer) {
+        chatContainer.scrollTo({
+            top: chatContainer.scrollHeight,
+            behavior: 'smooth'
+        });
+    }
+}, 500);
 }
 
 function showSelectedFlightSummary(selectedFlight) {
@@ -756,6 +786,16 @@ function proceedToPassengerForm() {
     console.log('Passage au formulaire passager');
     bookingState.currentStep = 'passengers';
     showPassengerForm();
+    // Auto-scroll après formulaire  
+setTimeout(() => {
+    const chatContainer = document.getElementById('chatContainer');
+    if (chatContainer) {
+        chatContainer.scrollTo({
+            top: chatContainer.scrollHeight,
+            behavior: 'smooth'
+        });
+    }
+}, 600);
 }
 
 // ====================
