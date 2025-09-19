@@ -19,27 +19,50 @@ let bookingState = {
 
 // ===== FONCTIONS UTILITAIRES =====
 function addMessage(content, isUser = false, isHtml = false) {
-
-
-
-    const messagesContainer = document.getElementById('chatContainer');
-
-    // Protection contre l'élément manquant
-    if (!messagesContainer) {
-        console.error('Élément #messages non trouvé dans le HTML');
+    const chatContainer = document.getElementById('chatContainer');
+    if (!chatContainer) {
+        console.error('Élément #chatContainer non trouvé');
         return;
     }
+
     const messageDiv = document.createElement('div');
-    messageDiv.className = isUser ? 'message user-message' : 'message bot-message';
+    messageDiv.className = isUser ? 'message user' : 'message bot';
+    
+    // Structure cohérente avec votre HTML
+    const avatarDiv = document.createElement('div');
+    avatarDiv.className = isUser ? 'avatar user' : 'avatar bot';
+    avatarDiv.textContent = isUser ? '👤' : '🤖';
+    
+    const bubbleDiv = document.createElement('div');
+    bubbleDiv.className = 'message-bubble';
     
     if (isHtml) {
-        messageDiv.innerHTML = content;
+        bubbleDiv.innerHTML = content;
     } else {
-        messageDiv.textContent = content;
+        bubbleDiv.textContent = content;
     }
     
-    messagesContainer.appendChild(messageDiv);
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    messageDiv.appendChild(avatarDiv);
+    messageDiv.appendChild(bubbleDiv);
+    chatContainer.appendChild(messageDiv);
+    
+    // Scroll vers le bas
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+}
+
+function showTypingIndicator(show = true) {
+    const typingIndicator = document.getElementById('typingIndicator');
+    if (typingIndicator) {
+        typingIndicator.style.display = show ? 'flex' : 'none';
+    }
+}
+
+function clearMessageInput() {
+    const messageInput = document.getElementById('userMessage');
+    if (messageInput) {
+        messageInput.value = '';
+        messageInput.style.height = 'auto';
+    }
 }
 
 function safeGetPassengerData(passenger) {
@@ -56,41 +79,63 @@ function safeGetPassengerData(passenger) {
 }
 
 // ===== RECHERCHE DE VOLS =====
-async function searchFlights(userMessage) {
-    console.log('Recherche de vols:', userMessage);
+async function searchFlights() {
+    const messageInput = document.getElementById('userMessage');
+    if (!messageInput) {
+        console.error('Input userMessage introuvable');
+        return;
+    }
     
-    addMessage('🔍 Recherche des meilleurs vols...', false);
+    const userMessage = messageInput.value.trim();
+    if (!userMessage) {
+        addMessage('Veuillez entrer votre recherche de vol.', false);
+        return;
+    }
+    
+    // Afficher le message utilisateur
+    addMessage(userMessage, true);
+    clearMessageInput();
+    
+    // Afficher l'indicateur de frappe
+    showTypingIndicator(true);
+    addMessage('Recherche des meilleurs vols...', false);
     
     try {
         const response = await fetch(API_ENDPOINTS.flightSearch, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
             body: JSON.stringify({
                 message: userMessage,
                 sessionId: bookingState.sessionId
             })
         });
 
+        showTypingIndicator(false);
+
         if (!response.ok) {
             throw new Error(`Erreur HTTP: ${response.status}`);
         }
 
         const data = await response.json();
-        console.log('Réponse recherche:', data);
+        console.log('Réponse API:', data);
 
         if (data.success && data.bestFlights && data.bestFlights.length > 0) {
             bookingState.searchResults = data;
             bookingState.searchParams = data.searchParams;
             displayFlightResults(data);
         } else if (data.error === 'NO_FLIGHTS_FOUND') {
-            addMessage('❌ Aucun vol trouvé pour votre recherche. Essayez avec d\'autres dates ou destinations.', false);
+            addMessage('Aucun vol trouvé pour votre recherche. Essayez avec d\'autres dates ou destinations.', false);
         } else {
-            addMessage('❌ Erreur lors de la recherche de vols. Veuillez réessayer avec une demande plus précise.', false);
+            addMessage(`Erreur: ${data.error?.message || 'Erreur lors de la recherche'}`, false);
         }
 
     } catch (error) {
+        showTypingIndicator(false);
         console.error('Erreur recherche vols:', error);
-        addMessage('❌ Erreur de connexion. Veuillez vérifier votre connexion internet et réessayer.', false);
+        addMessage(`Erreur de connexion: ${error.message}`, false);
     }
 }
 
@@ -100,7 +145,7 @@ function displayFlightResults(data) {
     
     let resultHtml = `
         <div style="background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; border-radius: 16px; padding: 20px; margin: 15px 0;">
-            <h3 style="margin: 0 0 10px 0;">✈️ Vols trouvés</h3>
+            <h3 style="margin: 0 0 10px 0;">Vols trouvés</h3>
             <p style="margin: 0; opacity: 0.9;">${searchInfo.originCity || 'Origine'} → ${searchInfo.destinationCity || 'Destination'}</p>
             <p style="margin: 5px 0 0 0; font-size: 14px; opacity: 0.8;">${flights.length} vol(s) analysé(s) par IA</p>
         </div>
@@ -159,7 +204,7 @@ function displayFlightResults(data) {
 
 function selectFlight(flightIndex) {
     if (!bookingState.searchResults || !bookingState.searchResults.bestFlights) {
-        addMessage('❌ Erreur: données de vol non disponibles', false);
+        addMessage('Erreur: données de vol non disponibles', false);
         return;
     }
     
@@ -171,7 +216,7 @@ function selectFlight(flightIndex) {
     const price = selectedFlight.price?.amount || selectedFlight.price?.total || 0;
     const currency = selectedFlight.price?.currency || 'EUR';
     
-    addMessage(`✅ Vol sélectionné: ${airline} - ${price} ${currency}`, false);
+    addMessage(`Vol sélectionné: ${airline} - ${price} ${currency}`, false);
     
     sessionStorage.setItem('bookingState', JSON.stringify(bookingState));
     
@@ -182,7 +227,7 @@ function selectFlight(flightIndex) {
 function showPassengerForm() {
     const formHtml = `
         <div style="background: #f8fafc; border-radius: 12px; padding: 20px; margin: 15px 0;">
-            <h3 style="color: #1f2937; margin: 0 0 20px 0;">👤 Informations passager</h3>
+            <h3 style="color: #1f2937; margin: 0 0 20px 0;">Informations passager</h3>
             
             <form id="passenger-form" onsubmit="submitPassengerInfo(event)">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
@@ -221,7 +266,7 @@ function showPassengerForm() {
                            style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
                 </div>
                 
-                <h4 style="color: #1f2937; margin: 20px 0 15px 0;">📧 Contact</h4>
+                <h4 style="color: #1f2937; margin: 20px 0 15px 0;">Contact</h4>
                 
                 <div style="margin-bottom: 15px;">
                     <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #374151;">Email *</label>
@@ -265,7 +310,7 @@ function submitPassengerInfo(event) {
     
     // Validation
     if (!passengerData.firstName || !passengerData.lastName || !contactData.email) {
-        addMessage('❌ Veuillez remplir tous les champs obligatoires', false);
+        addMessage('Veuillez remplir tous les champs obligatoires', false);
         return;
     }
     
@@ -275,7 +320,7 @@ function submitPassengerInfo(event) {
     
     sessionStorage.setItem('bookingState', JSON.stringify(bookingState));
     
-    addMessage(`✅ Informations enregistrées pour ${passengerData.firstName} ${passengerData.lastName}`, false);
+    addMessage(`Informations enregistrées pour ${passengerData.firstName} ${passengerData.lastName}`, false);
     
     showBookingConfirmation();
 }
@@ -292,31 +337,31 @@ function showBookingConfirmation() {
     
     const confirmationHtml = `
         <div style="background: #f8fafc; border-radius: 12px; padding: 20px; margin: 15px 0;">
-            <h3 style="color: #1f2937; margin: 0 0 20px 0;">📋 Récapitulatif de réservation</h3>
+            <h3 style="color: #1f2937; margin: 0 0 20px 0;">Récapitulatif de réservation</h3>
             
             <div style="background: white; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
-                <h4 style="margin: 0 0 10px 0; color: #059669;">✈️ Vol sélectionné</h4>
+                <h4 style="margin: 0 0 10px 0; color: #059669;">Vol sélectionné</h4>
                 <div><strong>${airline}</strong></div>
                 <div>Prix: <strong>${price} ${currency}</strong></div>
                 <div>Horaires: ${flight.schedule?.departure || 'N/A'} → ${flight.schedule?.arrival || 'N/A'}</div>
             </div>
             
             <div style="background: white; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
-                <h4 style="margin: 0 0 10px 0; color: #059669;">👤 Passager</h4>
+                <h4 style="margin: 0 0 10px 0; color: #059669;">Passager</h4>
                 <div><strong>${passenger.fullName}</strong></div>
                 <div>Né(e) le: ${passenger.dateOfBirth}</div>
                 <div>Passeport: ${passenger.passportNumber || 'Non renseigné'}</div>
             </div>
             
             <div style="background: white; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
-                <h4 style="margin: 0 0 10px 0; color: #059669;">📧 Contact</h4>
+                <h4 style="margin: 0 0 10px 0; color: #059669;">Contact</h4>
                 <div>Email: <strong>${contact.email}</strong></div>
                 <div>Téléphone: ${contact.phone || 'Non renseigné'}</div>
             </div>
             
             <div style="background: #fef3c7; border: 1px solid #fbbf24; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
                 <div style="font-size: 14px; color: #92400e;">
-                    <strong>⚠️ Important:</strong> Après confirmation, vous serez redirigé vers une page de paiement sécurisé. 
+                    <strong>Important:</strong> Après confirmation, vous serez redirigé vers une page de paiement sécurisé. 
                     Votre réservation sera finalisée après paiement réussi.
                 </div>
             </div>
@@ -324,11 +369,11 @@ function showBookingConfirmation() {
             <div style="display: flex; gap: 10px;">
                 <button onclick="confirmBooking()" 
                         style="flex: 1; background: #059669; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: 600; cursor: pointer;">
-                    💳 Confirmer et payer
+                    Confirmer et payer
                 </button>
                 <button onclick="showPassengerForm()" 
                         style="flex: 1; background: #6b7280; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: 600; cursor: pointer;">
-                    ✏️ Modifier
+                    Modifier
                 </button>
             </div>
         </div>
@@ -341,7 +386,7 @@ function showBookingConfirmation() {
 async function confirmBooking() {
     console.log('Confirmation finale - Paiement puis réservation');
     
-    addMessage('💳 Préparation du paiement sécurisé...', false);
+    addMessage('Préparation du paiement sécurisé...', false);
     
     try {
         const response = await fetch(API_ENDPOINTS.bookingConfirm, {
@@ -363,12 +408,12 @@ async function confirmBooking() {
         } else if (data.success && data.duffelOrder) {
             showRealBookingSuccess(data);
         } else {
-            addMessage(`❌ ${data.error?.message || 'Erreur lors de la réservation'}`, false);
+            addMessage(`Erreur: ${data.error?.message || 'Erreur lors de la réservation'}`, false);
         }
 
     } catch (error) {
         console.error('Erreur réservation:', error);
-        addMessage('❌ Erreur de connexion. Veuillez réessayer.', false);
+        addMessage('Erreur de connexion. Veuillez réessayer.', false);
     }
 }
 
@@ -385,7 +430,7 @@ function showSimplePaymentPage(data) {
                 
                 <button onclick="window.open('${data.paymentUrl}', '_blank')" 
                         style="background: #059669; color: white; border: none; padding: 15px 30px; border-radius: 25px; font-size: 16px; font-weight: 600; cursor: pointer; margin: 15px;">
-                    💳 Payer maintenant
+                    Payer maintenant
                 </button>
                 
                 <div style="font-size: 14px; margin-top: 15px; opacity: 0.9;">
@@ -396,71 +441,6 @@ function showSimplePaymentPage(data) {
     `;
     
     addMessage(paymentHtml, false, true);
-}
-
-function showRealBookingSuccess(data) {
-    const passenger = safeGetPassengerData(bookingState.passengers?.[0]);
-    const totalPrice = `${data.totalAmount || data.paymentAmount} ${data.totalCurrency || data.paymentCurrency}`;
-    const confirmationNumber = data.confirmationNumber;
-    
-    const successHtml = `
-        <div style="background: linear-gradient(135deg, #059669, #10b981); color: white; border-radius: 16px; padding: 25px; margin: 15px 0;">
-            <div style="text-align: center; margin-bottom: 25px;">
-                <div style="font-size: 24px; margin-bottom: 10px;">🎉</div>
-                <div style="font-size: 20px; font-weight: bold;">Réservation CONFIRMÉE !</div>
-                <div style="font-size: 14px; opacity: 0.9;">Votre vol est officiellement réservé</div>
-            </div>
-            
-            <div style="background: white; color: #1f2937; border-radius: 12px; padding: 20px;">
-                <div style="background: #10b981; color: white; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 20px;">
-                    <div style="font-size: 14px; opacity: 0.9; margin-bottom: 5px;">✅ CONFIRMÉ - Numéro de confirmation</div>
-                    <div style="font-size: 24px; font-weight: bold; letter-spacing: 1px;">${confirmationNumber}</div>
-                </div>
-                
-                <div style="background: #dcfce7; color: #065f46; padding: 12px; border-radius: 8px; margin-bottom: 15px; text-align: center;">
-                    <strong>📧 Email de confirmation envoyé !</strong><br>
-                    Vérifiez votre boîte mail : ${bookingState.contact.email}
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    <h4 style="margin: 0 0 8px 0; color: #1f2937;">👤 Passager</h4>
-                    <div style="font-size: 14px; color: #6b7280;">
-                        ${passenger.fullName}<br>
-                        📧 ${bookingState.contact?.email}<br>
-                        📞 ${bookingState.contact?.phone || 'Non renseigné'}
-                    </div>
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    <h4 style="margin: 0 0 8px 0; color: #1f2937;">✈️ Vol confirmé</h4>
-                    <div style="font-size: 14px; color: #6b7280;">
-                        ${bookingState.selectedFlight?.airline?.name || 'Compagnie aérienne'}<br>
-                        Prix total: <strong>${totalPrice}</strong><br>
-                        Réservé via: <strong>Duffel API (réel)</strong>
-                    </div>
-                </div>
-                
-                <div style="background: #fef3c7; color: #92400e; padding: 12px; border-radius: 8px; margin: 15px 0;">
-                    <div style="font-size: 13px;">
-                        <strong>📋 Étapes suivantes :</strong><br>
-                        • Vérifiez l'email de confirmation reçu<br>
-                        • Enregistrement en ligne 24h avant le départ<br>
-                        • Arrivez 2h avant l'heure de départ<br>
-                        • Vérifiez la validité de vos documents de voyage
-                    </div>
-                </div>
-                
-                <div style="text-align: center; margin-top: 20px;">
-                    <button onclick="resetBooking()" 
-                            style="background: #10b981; color: white; border: none; padding: 10px 20px; border-radius: 20px; font-weight: 600; cursor: pointer;">
-                        🔍 Nouvelle recherche
-                    </button>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    addMessage(successHtml, false, true);
 }
 
 // ===== RÉINITIALISATION =====
@@ -484,29 +464,10 @@ function resetBooking() {
     addMessage('Nouvelle recherche initialisée. Décrivez votre voyage et je trouverai les meilleurs vols !', false);
 }
 
-// ===== GESTION DES MESSAGES =====
-function sendMessage() {
-    const input = document.getElementById('message-input');
-    const message = input.value.trim();
-    
-    if (!message) return;
-    
-    addMessage(message, true);
-    input.value = '';
-    
-    // Recherche de vols
-    searchFlights(message);
-}
-
-// Gestion de la touche Entrée
-document.getElementById('message-input')?.addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') {
-        sendMessage();
-    }
-});
-
 // ===== INITIALISATION =====
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM chargé, initialisation...');
+    
     // Restaurer l'état depuis sessionStorage
     const savedState = sessionStorage.getItem('bookingState');
     if (savedState) {
@@ -517,6 +478,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Message de bienvenue
-    addMessage('Bonjour ! Je suis votre assistant de réservation de vols. Décrivez votre voyage (origine, destination, date) et je trouverai les meilleures options pour vous !', false);
+    // Masquer l'indicateur de frappe au démarrage
+    showTypingIndicator(false);
+    
+    console.log('Interface initialisée avec succès');
 });
