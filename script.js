@@ -144,11 +144,21 @@ async function searchFlights() {
 // À ajouter dans votre script.js
 // ====================
 
+// ====================
+// FONCTION displayFlightResults - VERSION AUTONOME
+// Remplace la version précédente, ne dépend d'aucune autre fonction
+// ====================
+
 function displayFlightResults(data) {
     const flights = data.bestFlights || [];
     const searchParams = data.searchParams || {};
     
     console.log('Affichage de', flights.length, 'vols');
+    
+    if (flights.length === 0) {
+        addMessage('Aucun vol trouvé pour votre recherche.', false);
+        return;
+    }
     
     let resultsHtml = `
         <div style="background: linear-gradient(135deg, #1e40af, #3b82f6); color: white; border-radius: 16px; padding: 20px; margin: 15px 0;">
@@ -163,15 +173,120 @@ function displayFlightResults(data) {
     `;
 
     flights.forEach((flight, index) => {
-        const pricing = safeGetPricing(flight);
-        const score = Math.min(flight.score || 70, 100);
+        // Extraction du prix - VERSION INTERNE
+        let price = 0;
+        let currency = 'EUR';
+        let priceFormatted = '0 EUR';
+        
+        try {
+            if (flight.price && flight.price.total) {
+                price = parseFloat(flight.price.total);
+                currency = flight.price.currency || 'EUR';
+            } else if (flight.price && flight.price.amount) {
+                price = parseFloat(flight.price.amount);
+                currency = flight.price.currency || 'EUR';
+            } else if (flight.total_amount) {
+                price = parseFloat(flight.total_amount);
+                currency = flight.total_currency || 'EUR';
+            } else if (flight.price && flight.price.grandTotal) {
+                price = parseFloat(flight.price.grandTotal);
+                currency = flight.price.currency || 'EUR';
+            }
+            
+            priceFormatted = `${price.toFixed(2)} ${currency}`;
+        } catch (error) {
+            console.warn('Erreur extraction prix vol', index + 1, ':', error);
+            priceFormatted = 'Prix N/A';
+        }
+        
+        // Score IA
+        const score = Math.min(Math.max(flight.score || flight.aiAnalysis?.score || 70, 0), 100);
+        
+        // Médaille
         const medalEmoji = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '🏅';
         
-        // Extraire les informations de vol
-        const airlineName = flight.airline?.name || 'Compagnie aérienne';
-        const scheduleOut = flight.schedule || {};
-        const scheduleIn = flight.inbound || null;
+        // Compagnie aérienne
+        let airlineName = 'Compagnie aérienne';
+        try {
+            if (flight.airline && flight.airline.name) {
+                airlineName = flight.airline.name;
+            } else if (flight.validatingAirlineCodes && flight.validatingAirlineCodes[0]) {
+                const code = flight.validatingAirlineCodes[0];
+                airlineName = getAirlineNameFromCode(code);
+            } else if (flight.duffelData && flight.duffelData.slices && flight.duffelData.slices[0] && 
+                      flight.duffelData.slices[0].segments && flight.duffelData.slices[0].segments[0]) {
+                const segment = flight.duffelData.slices[0].segments[0];
+                airlineName = segment.marketing_carrier?.name || segment.operating_carrier?.name || 'Compagnie';
+            }
+        } catch (error) {
+            console.warn('Erreur extraction compagnie vol', index + 1, ':', error);
+        }
         
+        // Horaires vol aller
+        let scheduleOutText = 'Horaires non disponibles';
+        try {
+            if (flight.schedule) {
+                const dep = flight.schedule.departure || 'N/A';
+                const arr = flight.schedule.arrival || 'N/A';
+                const dur = formatDurationInternal(flight.schedule.duration) || 'N/A';
+                const stops = flight.stops || 0;
+                const stopsText = stops > 0 ? ` | ${stops} escale${stops > 1 ? 's' : ''}` : '';
+                scheduleOutText = `${dep} → ${arr} | ${dur}${stopsText}`;
+            } else if (flight.duffelData && flight.duffelData.slices && flight.duffelData.slices[0]) {
+                // Extraction depuis duffelData
+                const slice = flight.duffelData.slices[0];
+                const segments = slice.segments || [];
+                if (segments.length > 0) {
+                    const firstSeg = segments[0];
+                    const lastSeg = segments[segments.length - 1];
+                    
+                    const depTime = formatTimeFromISO(firstSeg.departing_at);
+                    const arrTime = formatTimeFromISO(lastSeg.arriving_at);
+                    const depAirport = firstSeg.origin?.iata_code || 'XXX';
+                    const arrAirport = lastSeg.destination?.iata_code || 'XXX';
+                    const duration = formatDurationInternal(slice.duration);
+                    const stops = Math.max(0, segments.length - 1);
+                    const stopsText = stops > 0 ? ` | ${stops} escale${stops > 1 ? 's' : ''}` : '';
+                    
+                    scheduleOutText = `${depTime} ${depAirport} → ${arrTime} ${arrAirport} | ${duration}${stopsText}`;
+                }
+            }
+        } catch (error) {
+            console.warn('Erreur extraction horaires aller vol', index + 1, ':', error);
+        }
+        
+        // Horaires vol retour (si existe)
+        let scheduleInText = '';
+        let hasReturn = false;
+        try {
+            if (flight.inbound) {
+                hasReturn = true;
+                const dep = flight.inbound.departure || 'N/A';
+                const arr = flight.inbound.arrival || 'N/A';
+                const dur = formatDurationInternal(flight.inbound.duration) || 'N/A';
+                scheduleInText = `${dep} → ${arr} | ${dur}`;
+            } else if (flight.duffelData && flight.duffelData.slices && flight.duffelData.slices[1]) {
+                hasReturn = true;
+                const slice = flight.duffelData.slices[1];
+                const segments = slice.segments || [];
+                if (segments.length > 0) {
+                    const firstSeg = segments[0];
+                    const lastSeg = segments[segments.length - 1];
+                    
+                    const depTime = formatTimeFromISO(firstSeg.departing_at);
+                    const arrTime = formatTimeFromISO(lastSeg.arriving_at);
+                    const depAirport = firstSeg.origin?.iata_code || 'XXX';
+                    const arrAirport = lastSeg.destination?.iata_code || 'XXX';
+                    const duration = formatDurationInternal(slice.duration);
+                    
+                    scheduleInText = `${depTime} ${depAirport} → ${arrTime} ${arrAirport} | ${duration}`;
+                }
+            }
+        } catch (error) {
+            console.warn('Erreur extraction horaires retour vol', index + 1, ':', error);
+        }
+        
+        // Construction HTML du vol
         resultsHtml += `
             <div style="background: white; color: #1f2937; border-radius: 12px; padding: 18px; margin: 10px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border: 1px solid #e5e7eb;">
                 
@@ -182,7 +297,7 @@ function displayFlightResults(data) {
                     </div>
                     <div style="text-align: right;">
                         <div style="font-size: 18px; font-weight: bold; color: #059669;">
-                            ${pricing.formatted}
+                            ${priceFormatted}
                         </div>
                         <div style="font-size: 12px; color: #6b7280;">
                             Score: ${score}/100
@@ -196,18 +311,18 @@ function displayFlightResults(data) {
                         🛫 ALLER - ${airlineName}
                     </div>
                     <div style="font-size: 14px; color: #374151; margin-bottom: 4px;">
-                        ${scheduleOut.departure || 'N/A'} → ${scheduleOut.arrival || 'N/A'} | ${formatDuration(scheduleOut.duration)}${flight.stops > 0 ? ` | ${flight.stops} escale${flight.stops > 1 ? 's' : ''}` : ''}
+                        ${scheduleOutText}
                     </div>
                 </div>
                 
                 <!-- Vol RETOUR (si existe) -->
-                ${scheduleIn ? `
+                ${hasReturn ? `
                 <div style="margin: 8px 0; padding: 8px 0; border-left: 3px solid #8b5cf6; padding-left: 12px;">
                     <div style="font-size: 14px; font-weight: 600; color: #1f2937; margin-bottom: 6px;">
                         🛬 RETOUR - ${airlineName}
                     </div>
                     <div style="font-size: 14px; color: #374151; margin-bottom: 4px;">
-                        ${scheduleIn.departure || 'N/A'} → ${scheduleIn.arrival || 'N/A'} | ${formatDuration(scheduleIn.duration)}
+                        ${scheduleInText}
                     </div>
                 </div>
                 ` : ''}
@@ -225,11 +340,72 @@ function displayFlightResults(data) {
 
     resultsHtml += '</div>';
     
-    // Sauvegarder les résultats
+    // Sauvegarder les résultats dans l'état global
     bookingState.searchResults = flights;
     bookingState.searchParams = searchParams;
     
     addMessage(resultsHtml, false, true);
+}
+
+// ====================
+// FONCTIONS UTILITAIRES INTERNES
+// ====================
+
+function getAirlineNameFromCode(code) {
+    const airlines = {
+        'AF': 'Air France', 'LH': 'Lufthansa', 'BA': 'British Airways',
+        'KL': 'KLM', 'SN': 'Brussels Airlines', 'FR': 'Ryanair',
+        'U2': 'easyJet', 'EK': 'Emirates', 'QR': 'Qatar Airways',
+        'AZ': 'ITA Airways', 'TK': 'Turkish Airlines', 'IB': 'Iberia',
+        'VY': 'Vueling', 'W6': 'Wizz Air', 'DL': 'Delta', 'AA': 'American'
+    };
+    return airlines[code] || `${code} Airlines`;
+}
+
+function formatDurationInternal(duration) {
+    if (!duration) return 'N/A';
+    
+    try {
+        // Format Duffel PT15H30M
+        if (duration.startsWith('PT')) {
+            const dayMatch = duration.match(/(\d+)D/);
+            const hourMatch = duration.match(/(\d+)H/);
+            const minMatch = duration.match(/(\d+)M/);
+            
+            const days = dayMatch ? parseInt(dayMatch[1]) : 0;
+            const hours = hourMatch ? parseInt(hourMatch[1]) : 0;
+            const minutes = minMatch ? parseInt(minMatch[1]) : 0;
+            
+            const totalHours = days * 24 + hours;
+            return `${totalHours}h${minutes.toString().padStart(2, '0')}m`;
+        }
+        
+        // Format simple déjà lisible
+        if (duration.includes('h') || duration.includes('H')) {
+            return duration.toLowerCase();
+        }
+        
+        return duration;
+    } catch (error) {
+        console.warn('Erreur formatage durée:', duration, error);
+        return 'N/A';
+    }
+}
+
+function formatTimeFromISO(isoString) {
+    if (!isoString) return 'N/A';
+    
+    try {
+        const date = new Date(isoString);
+        return date.toLocaleTimeString('fr-FR', {
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZone: 'UTC'
+        });
+    } catch (error) {
+        console.warn('Erreur formatage heure:', isoString, error);
+        return 'N/A';
+    }
 }
 
 // ====================
