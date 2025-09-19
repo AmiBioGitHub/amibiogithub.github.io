@@ -576,7 +576,7 @@ function formatTimeFromISO(isoString) {
     }
 }
 
-/ ====================
+// ====================
 // CORRECTION 2: Fonction extractLayoverInfo - Version corrigée  
 // Remplacez votre fonction existante par celle-ci
 // ====================
