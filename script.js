@@ -310,9 +310,14 @@ function displayFlightResults(data) {
                     <div style="font-size: 14px; font-weight: 600; color: #1f2937; margin-bottom: 6px;">
                         🛫 ALLER - ${airlineName}
                     </div>
-                    <div style="font-size: 14px; color: #374151; margin-bottom: 4px;">
-                        ${scheduleOutText}
-                    </div>
+                    <!-- AJOUT: Affichage des escales -->
+${(() => {
+    const layovers = extractLayoverInfo(flight, 0); // 0 = vol aller
+    return layovers.length > 0 ? 
+        `<div style="font-size: 12px; color: #6b7280; margin-top: 4px; padding-left: 8px;">
+            🔄 Correspondances: ${layovers.map(l => `${l.airport} - ${l.duration} ${l.status}`).join(' • ')}
+        </div>` : '';
+})()}
                 </div>
                 
                 <!-- Vol RETOUR (si existe) -->
