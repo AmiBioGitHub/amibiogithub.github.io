@@ -101,6 +101,129 @@ function addMessage(content, isUser = false, isHtml = false) {
     originalAddMessage(content, isUser, isHtml);
 }
 
+
+// ====================
+// FONCTION displayFlightResults - MANQUANTE DANS VOTRE CODE
+// À ajouter dans votre script.js
+// ====================
+
+function displayFlightResults(data) {
+    const flights = data.bestFlights || [];
+    const searchParams = data.searchParams || {};
+    
+    console.log('Affichage de', flights.length, 'vols');
+    
+    let resultsHtml = `
+        <div style="background: linear-gradient(135deg, #1e40af, #3b82f6); color: white; border-radius: 16px; padding: 20px; margin: 15px 0;">
+            <div style="text-align: center; margin-bottom: 15px;">
+                <div style="font-size: 20px; font-weight: bold;">✈️ Vols Disponibles</div>
+                <div style="font-size: 14px; opacity: 0.9;">
+                    ${searchParams.originCity || 'Origine'} → ${searchParams.destinationCity || 'Destination'}
+                    ${searchParams.departureDate ? ` | ${new Date(searchParams.departureDate).toLocaleDateString('fr-FR')}` : ''}
+                    ${searchParams.returnDate ? ` | Retour: ${new Date(searchParams.returnDate).toLocaleDateString('fr-FR')}` : ''}
+                </div>
+            </div>
+    `;
+
+    flights.forEach((flight, index) => {
+        const pricing = safeGetPricing(flight);
+        const score = Math.min(flight.score || 70, 100);
+        const medalEmoji = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '🏅';
+        
+        // Extraire les informations de vol
+        const airlineName = flight.airline?.name || 'Compagnie aérienne';
+        const scheduleOut = flight.schedule || {};
+        const scheduleIn = flight.inbound || null;
+        
+        resultsHtml += `
+            <div style="background: white; color: #1f2937; border-radius: 12px; padding: 18px; margin: 10px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border: 1px solid #e5e7eb;">
+                
+                <!-- En-tête compact -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <div style="font-size: 16px; font-weight: bold; color: #1f2937;">
+                        ${medalEmoji} Vol ${index + 1}
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 18px; font-weight: bold; color: #059669;">
+                            ${pricing.formatted}
+                        </div>
+                        <div style="font-size: 12px; color: #6b7280;">
+                            Score: ${score}/100
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Vol ALLER -->
+                <div style="margin: 8px 0; padding: 8px 0; border-left: 3px solid #3b82f6; padding-left: 12px;">
+                    <div style="font-size: 14px; font-weight: 600; color: #1f2937; margin-bottom: 6px;">
+                        🛫 ALLER - ${airlineName}
+                    </div>
+                    <div style="font-size: 14px; color: #374151; margin-bottom: 4px;">
+                        ${scheduleOut.departure || 'N/A'} → ${scheduleOut.arrival || 'N/A'} | ${formatDuration(scheduleOut.duration)}${flight.stops > 0 ? ` | ${flight.stops} escale${flight.stops > 1 ? 's' : ''}` : ''}
+                    </div>
+                </div>
+                
+                <!-- Vol RETOUR (si existe) -->
+                ${scheduleIn ? `
+                <div style="margin: 8px 0; padding: 8px 0; border-left: 3px solid #8b5cf6; padding-left: 12px;">
+                    <div style="font-size: 14px; font-weight: 600; color: #1f2937; margin-bottom: 6px;">
+                        🛬 RETOUR - ${airlineName}
+                    </div>
+                    <div style="font-size: 14px; color: #374151; margin-bottom: 4px;">
+                        ${scheduleIn.departure || 'N/A'} → ${scheduleIn.arrival || 'N/A'} | ${formatDuration(scheduleIn.duration)}
+                    </div>
+                </div>
+                ` : ''}
+                
+                <!-- Bouton de sélection -->
+                <div style="text-align: center; margin-top: 15px;">
+                    <button onclick="selectFlight(${index})" 
+                            style="background: linear-gradient(135deg, #059669, #047857); color: white; border: none; padding: 10px 20px; border-radius: 20px; font-weight: 600; cursor: pointer; font-size: 14px;">
+                        Sélectionner ce vol
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+
+    resultsHtml += '</div>';
+    
+    // Sauvegarder les résultats
+    bookingState.searchResults = flights;
+    bookingState.searchParams = searchParams;
+    
+    addMessage(resultsHtml, false, true);
+}
+
+// ====================
+// FONCTION UTILITAIRE POUR FORMATAGE DURÉE
+// ====================
+
+// Cette fonction existe déjà dans votre code mais voici une version améliorée
+function formatDuration(duration) {
+    if (!duration) return 'N/A';
+    
+    // Convertir P1DT7H10M en format lisible
+    if (duration.startsWith('P')) {
+        const dayMatch = duration.match(/(\d+)D/);
+        const hourMatch = duration.match(/(\d+)H/);
+        const minMatch = duration.match(/(\d+)M/);
+        
+        const days = dayMatch ? parseInt(dayMatch[1]) : 0;
+        const hours = hourMatch ? parseInt(hourMatch[1]) : 0;
+        const minutes = minMatch ? parseInt(minMatch[1]) : 0;
+        
+        const totalHours = days * 24 + hours;
+        return `${totalHours}h${minutes.toString().padStart(2, '0')}m`;
+    }
+    
+    // Format simple comme "15h30m"
+    if (duration.includes('h') || duration.includes('H')) {
+        return duration.toLowerCase();
+    }
+    
+    return duration;
+}
 // ====================
 // AMÉLIORATION DE LA GESTION D'ERREUR DANS searchFlights
 // ====================
