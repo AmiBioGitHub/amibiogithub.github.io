@@ -218,19 +218,21 @@
             padding: 20px;
             overflow: auto;
             display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 400px;
+            align-items: flex-start;
+            justify-content: flex-start;
+            min-height: 500px;
             background: #ffffff;
         }
 
         .diagram-output {
-            max-width: 100%;
-            overflow: auto;
+            min-width: 100%;
+            overflow: visible;
+            padding: 20px;
         }
 
         .diagram-output svg {
-            max-width: 100%;
+            display: block;
+            min-width: 600px;
             height: auto;
         }
 
@@ -524,6 +526,12 @@ graph TD
                             <button class="btn btn-icon btn-secondary" onclick="zoomIn()" title="Zoom +">➕</button>
                             <button class="btn btn-icon btn-secondary" onclick="resetZoom()" title="Reset">🔄</button>
                         </div>
+                        <select id="exportQuality" class="btn btn-secondary" onchange="updateExportScale()" title="Qualité export PNG">
+                            <option value="2">2x (Standard)</option>
+                            <option value="4" selected>4x (HD)</option>
+                            <option value="6">6x (Ultra HD)</option>
+                            <option value="8">8x (Max)</option>
+                        </select>
                         <button class="btn btn-secondary" onclick="downloadSVG()" title="Télécharger SVG">
                             💾 SVG
                         </button>
@@ -593,25 +601,49 @@ graph TD
     </div>
 
     <script>
-        // Initialize Mermaid
+        // Initialize Mermaid with larger diagram settings
         mermaid.initialize({
             startOnLoad: false,
             theme: 'default',
             securityLevel: 'loose',
             flowchart: {
-                useMaxWidth: true,
+                useMaxWidth: false,
                 htmlLabels: true,
-                curve: 'basis'
+                curve: 'basis',
+                padding: 20,
+                nodeSpacing: 50,
+                rankSpacing: 50
             },
             sequence: {
-                useMaxWidth: true,
+                useMaxWidth: false,
                 diagramMarginX: 50,
-                diagramMarginY: 10,
-                actorMargin: 50,
-                boxMargin: 10,
-                boxTextMargin: 5,
-                noteMargin: 10,
-                messageMargin: 35
+                diagramMarginY: 30,
+                actorMargin: 80,
+                boxMargin: 20,
+                boxTextMargin: 10,
+                noteMargin: 20,
+                messageMargin: 45,
+                width: 180,
+                height: 50
+            },
+            er: {
+                useMaxWidth: false,
+                fontSize: 14
+            },
+            gantt: {
+                useMaxWidth: false,
+                fontSize: 14,
+                barHeight: 30,
+                barGap: 8
+            },
+            pie: {
+                useMaxWidth: false
+            },
+            class: {
+                useMaxWidth: false
+            },
+            state: {
+                useMaxWidth: false
             }
         });
 
@@ -996,8 +1028,29 @@ graph TD
                 return;
             }
 
-            const svgData = new XMLSerializer().serializeToString(svg);
-            const blob = new Blob([svgData], { type: 'image/svg+xml' });
+            // Clone SVG to modify for export
+            const svgClone = svg.cloneNode(true);
+
+            // Get actual dimensions
+            const bbox = svg.getBBox();
+            const width = Math.max(bbox.width + 40, svg.clientWidth || 800);
+            const height = Math.max(bbox.height + 40, svg.clientHeight || 600);
+
+            // Set explicit dimensions for better compatibility
+            svgClone.setAttribute('width', width);
+            svgClone.setAttribute('height', height);
+            svgClone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+            svgClone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+
+            // Add white background
+            const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            bg.setAttribute('width', '100%');
+            bg.setAttribute('height', '100%');
+            bg.setAttribute('fill', 'white');
+            svgClone.insertBefore(bg, svgClone.firstChild);
+
+            const svgData = new XMLSerializer().serializeToString(svgClone);
+            const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
             const url = URL.createObjectURL(blob);
 
             const a = document.createElement('a');
@@ -1009,6 +1062,9 @@ graph TD
             showToast('SVG téléchargé', 'success');
         }
 
+        // Export scale factor for PNG (higher = better quality)
+        let exportScale = 4;
+
         function downloadPNG() {
             const svg = diagramOutput.querySelector('svg');
             if (!svg) {
@@ -1016,33 +1072,73 @@ graph TD
                 return;
             }
 
-            const svgData = new XMLSerializer().serializeToString(svg);
+            // Clone SVG for export
+            const svgClone = svg.cloneNode(true);
+
+            // Get dimensions
+            const bbox = svg.getBBox();
+            const width = Math.max(bbox.width + 40, svg.clientWidth || 800);
+            const height = Math.max(bbox.height + 40, svg.clientHeight || 600);
+
+            // Set explicit dimensions
+            svgClone.setAttribute('width', width);
+            svgClone.setAttribute('height', height);
+            svgClone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+
+            // Add white background
+            const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            bg.setAttribute('width', '100%');
+            bg.setAttribute('height', '100%');
+            bg.setAttribute('fill', 'white');
+            svgClone.insertBefore(bg, svgClone.firstChild);
+
+            const svgData = new XMLSerializer().serializeToString(svgClone);
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             const img = new Image();
 
             img.onload = function() {
-                canvas.width = img.width * 2;
-                canvas.height = img.height * 2;
+                // Use high resolution (4x scale for crisp export)
+                const scale = exportScale;
+                canvas.width = width * scale;
+                canvas.height = height * scale;
+
+                // Enable image smoothing for better quality
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+
+                // Fill white background
                 ctx.fillStyle = 'white';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Draw scaled image
                 ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-                const pngUrl = canvas.toDataURL('image/png');
+                const pngUrl = canvas.toDataURL('image/png', 1.0);
                 const a = document.createElement('a');
                 a.href = pngUrl;
                 a.download = 'diagram.png';
                 a.click();
 
-                showToast('PNG téléchargé', 'success');
+                showToast(`PNG téléchargé (${canvas.width}x${canvas.height}px)`, 'success');
+            };
+
+            img.onerror = function() {
+                showToast('Erreur lors de la génération du PNG', 'error');
             };
 
             img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
         }
 
+        // Update export scale from dropdown
+        function updateExportScale() {
+            const select = document.getElementById('exportQuality');
+            exportScale = parseInt(select.value);
+        }
+
         // Zoom functions
         function zoomIn() {
-            if (currentZoom < 200) {
+            if (currentZoom < 400) {
                 currentZoom += 25;
                 applyZoom();
             }
